@@ -7,6 +7,10 @@ import { getSupabaseAdmin } from "./supabase-server";
 const SOURCE_TABLE = process.env.SUPABASE_SOURCE_TABLE ?? "Source";
 const ARTICLE_TABLE = process.env.SUPABASE_ARTICLE_TABLE ?? "Article";
 
+function getSupabaseUrl(): string | undefined {
+  return process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
+}
+
 export type SourceRow = { id: string; name: string; slug: string };
 export type ArticleRow = {
   id: string;
@@ -43,29 +47,47 @@ export async function getArticlesSupabase(options: {
   sourceId?: string;
   q?: string;
 }): Promise<{ articles: ArticleRow[]; total: number }> {
-  const supabase = getSupabaseAdmin();
-  if (!supabase) return { articles: [], total: 0 };
-  const sb = supabase as any;
-  const cols = "id, sourceId, title, summary, url, publishedAt, externalId, entities, topics, opportunities, implications, forShareholders, forInvestors, forBusiness";
-  let dataQuery = sb.from(ARTICLE_TABLE).select(cols);
-  if (options.sourceId) dataQuery = dataQuery.eq("sourceId", options.sourceId);
+  const url = getSupabaseUrl();
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return { articles: [], total: 0 };
+
+  const cols = "id,sourceId,title,summary,url,publishedAt,externalId,entities,topics,opportunities,implications,forShareholders,forInvestors,forBusiness";
+  const params = new URLSearchParams();
+  params.set("select", cols);
+  params.set("order", "publishedAt.desc");
+  if (options.sourceId) params.set("sourceId", `eq.${options.sourceId}`);
   if (options.q?.trim()) {
     const t = options.q.trim().slice(0, 200);
-    const pattern = `%${t.replace(/%/g, "\\%")}%`;
-    dataQuery = dataQuery.or(`title.ilike.${pattern},summary.ilike.${pattern}`);
+    // PostgREST uses * as alias for % in ilike
+    params.set("or", `(title.ilike.*${t}*,summary.ilike.*${t}*)`);
   }
-  dataQuery = dataQuery.order("publishedAt", { ascending: false, nullsFirst: false });
   const from = options.offset;
   const to = options.offset + options.limit - 1;
-  const result = await dataQuery.range(from, to);
-  const { data, error, count } = result;
-  if (error) {
-    console.error("[data-supabase] getArticles", error);
+  const restUrl = `${url.replace(/\/$/, "")}/rest/v1/${ARTICLE_TABLE}?${params.toString()}`;
+  const res = await fetch(restUrl, {
+    method: "GET",
+    headers: {
+      apikey: key,
+      Authorization: `Bearer ${key}`,
+      "Content-Type": "application/json",
+      Prefer: "count=exact",
+      Range: `${from}-${to}`,
+    },
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    console.error("[data-supabase] getArticles", res.status, err);
     return { articles: [], total: 0 };
   }
-  const articles = Array.isArray(data) ? (data as ArticleRow[]) : [];
-  const total = typeof count === "number" ? count : articles.length;
-  return { articles, total };
+  const articles = (await res.json()) as ArticleRow[];
+  const contentRange = res.headers.get("Content-Range") ?? res.headers.get("content-range");
+  let total = Array.isArray(articles) ? articles.length : 0;
+  if (contentRange) {
+    const match = contentRange.match(/\/(\d+)$/);
+    if (match) total = parseInt(match[1], 10);
+  }
+  return { articles: Array.isArray(articles) ? articles : [], total };
 }
 
 export type IngestArticleInput = {
