@@ -57,6 +57,22 @@ For **local dev** without Supabase REST: add **SUPABASE_URL** and **SUPABASE_SER
 
 **Debug:** GET `/api/debug-db` shows which DB/feed store is in use. GET `/api/debug-articles` inspects raw Supabase article list response.
 
+**Backfill Blob → Supabase:** If the dashboard shows many articles (from Blob) but your Supabase `Article` table has only a few rows, run the one-time backfill so all feed items exist in Supabase:
+
+```bash
+curl -H "Authorization: Bearer YOUR_CRON_SECRET" "https://YOUR_APP.vercel.app/api/cron/backfill-articles"
+```
+
+Then in Supabase SQL Editor you can run:
+
+```sql
+SELECT a.id, a.title, a.summary, a."publishedAt", a.categories, s.name AS source_name
+FROM public."Article" a
+LEFT JOIN public."Source" s ON a."sourceId" = s.id
+ORDER BY a."publishedAt" DESC NULLS LAST
+LIMIT 50;
+```
+
 ## Scripts
 
 - `npm run dev` — Local dev server

@@ -48,6 +48,7 @@ export async function GET(request: NextRequest) {
   const sb = supabase as any;
 
   let backfilled = 0;
+  const errors: string[] = [];
   for (const a of feed) {
     if (!a.title || !a.sourceName) continue;
 
@@ -62,7 +63,10 @@ export async function GET(request: NextRequest) {
         .insert({ name: a.sourceName, slug })
         .select("id")
         .single();
-      if (sourceErr || !(newSource as { id?: string })?.id) continue;
+      if (sourceErr || !(newSource as { id?: string })?.id) {
+        errors.push(`Source ${a.sourceName}: ${(sourceErr as Error)?.message ?? "no id"}`);
+        continue;
+      }
       sourceId = (newSource as { id: string }).id;
     }
 
@@ -82,7 +86,11 @@ export async function GET(request: NextRequest) {
         { onConflict: "id" }
       );
 
-    if (!upsertErr) backfilled++;
+    if (upsertErr) {
+      errors.push(`Article ${a.id?.slice(0, 8)}: ${(upsertErr as Error)?.message ?? String(upsertErr)}`);
+    } else {
+      backfilled++;
+    }
   }
 
   return NextResponse.json({
@@ -90,5 +98,6 @@ export async function GET(request: NextRequest) {
     backfilled,
     total: feed.length,
     message: `Backfilled ${backfilled} of ${feed.length} articles into Supabase.`,
+    ...(errors.length > 0 && { errors: errors.slice(0, 10), errorCount: errors.length }),
   });
 }
