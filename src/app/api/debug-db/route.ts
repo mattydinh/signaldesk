@@ -25,6 +25,9 @@ export async function GET() {
   const match = url.match(/aws-0-([a-z0-9-]+)\.pooler\.supabase\.com/);
   if (match) region = match[1];
 
+  const feedBlob = !!(process.env.BLOB_READ_WRITE_TOKEN);
+  const feedKv = !!(process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN);
+
   return NextResponse.json({
     ok: true,
     hasUrl: true,
@@ -34,6 +37,7 @@ export async function GET() {
     usingPooler: isPooler,
     usingDirect: isDirect,
     region: region ?? (isPooler ? "could not parse" : null),
+    feedStore: { blob: feedBlob, kv: feedKv },
     hint: !usingSupabaseApi && hasSupabaseUrl
       ? "Supabase REST API is OFF: SUPABASE_SERVICE_ROLE_KEY is not set. Add it in Vercel (Supabase Dashboard → Settings → API → service_role secret) and redeploy."
       : !usingSupabaseApi && hasServiceRoleKey

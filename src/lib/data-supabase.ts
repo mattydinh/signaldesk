@@ -4,6 +4,8 @@
  */
 import { getSupabaseAdmin } from "./supabase-server";
 import { getFeedCache, setFeedCache, type CachedArticle } from "./feed-cache";
+import { hasBlobFeed, readFeedFromBlob, writeFeedToBlob } from "./feed-blob";
+import { hasKvFeed, readFeedFromKv, writeFeedToKv } from "./feed-kv";
 
 const SOURCE_TABLE = process.env.SUPABASE_SOURCE_TABLE ?? "Source";
 const ARTICLE_TABLE = process.env.SUPABASE_ARTICLE_TABLE ?? "Article";
@@ -47,6 +49,35 @@ export async function getArticlesSupabase(options: {
   sourceId?: string;
   q?: string;
 }): Promise<{ articles: (ArticleRow | CachedArticle)[]; total: number }> {
+  if (hasBlobFeed()) {
+    const blobFeed = await readFeedFromBlob();
+    if (blobFeed && blobFeed.length > 0) {
+      let list = blobFeed;
+      if (options.sourceId) list = list.filter((a) => a.sourceId === options.sourceId);
+      if (options.q?.trim()) {
+        const q = options.q.trim().toLowerCase();
+        list = list.filter((a) => a.title?.toLowerCase().includes(q) || (a.summary && a.summary.toLowerCase().includes(q)));
+      }
+      const total = list.length;
+      const articles = list.slice(options.offset, options.offset + options.limit);
+      return { articles, total };
+    }
+  }
+  if (hasKvFeed()) {
+    const kvFeed = await readFeedFromKv();
+    if (kvFeed && kvFeed.length > 0) {
+      let list = kvFeed;
+      if (options.sourceId) list = list.filter((a) => a.sourceId === options.sourceId);
+      if (options.q?.trim()) {
+        const q = options.q.trim().toLowerCase();
+        list = list.filter((a) => a.title?.toLowerCase().includes(q) || (a.summary && a.summary.toLowerCase().includes(q)));
+      }
+      const total = list.length;
+      const articles = list.slice(options.offset, options.offset + options.limit);
+      return { articles, total };
+    }
+  }
+
   const supabase = getSupabaseAdmin();
   if (!supabase) return { articles: [], total: 0 };
   const sb = supabase as any;
@@ -193,6 +224,8 @@ export async function ingestArticlesSupabase(
     sourceName: a.sourceName,
   }));
   setFeedCache(cacheEntries);
+  if (hasBlobFeed()) await writeFeedToBlob(cacheEntries);
+  if (hasKvFeed()) await writeFeedToKv(cacheEntries);
 
   return { created, skipped, total: articles.length };
 }
