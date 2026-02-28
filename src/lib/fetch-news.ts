@@ -27,33 +27,26 @@ export async function fetchAndIngestNews(): Promise<FetchNewsResult> {
         console.error("[fetch-news] News API error", res.status, err);
         continue;
       }
-      const data = (await res.json()) as {
-      status: string;
-      articles?: Array<{
-        source?: { id?: string; name?: string };
-        title?: string;
-        description?: string;
-        url?: string;
-        publishedAt?: string;
-      }>;
-    };
-    if (data.status !== "ok" || !Array.isArray(data.articles)) continue;
+      const raw = await res.json() as { status: string; articles?: Array<{ source?: { id?: string; name?: string }; title?: string; description?: string; url?: string; publishedAt?: string }> };
+      const data = raw;
+      if (data.status !== "ok" || !Array.isArray(data.articles)) continue;
 
-    for (const a of data.articles) {
-      if (!a.title) continue;
-      const dedupe = `${a.source?.id ?? "unknown"}-${a.title}`;
-      if (seen.has(dedupe)) continue;
-      seen.add(dedupe);
-      allArticles.push({
-        externalId: a.url ?? undefined,
-        sourceName: a.source?.name ?? "Unknown",
-        sourceSlug: a.source?.id ?? undefined,
-        title: a.title,
-        summary: a.description ?? undefined,
-        url: a.url ?? undefined,
-        publishedAt: a.publishedAt ?? undefined,
-        rawPayload: a,
-      });
+      for (const a of data.articles) {
+        if (!a.title) continue;
+        const dedupe = `${a.source?.id ?? "unknown"}-${a.title}`;
+        if (seen.has(dedupe)) continue;
+        seen.add(dedupe);
+        allArticles.push({
+          externalId: a.url ?? undefined,
+          sourceName: a.source?.name ?? "Unknown",
+          sourceSlug: a.source?.id ?? undefined,
+          title: a.title,
+          summary: a.description ?? undefined,
+          url: a.url ?? undefined,
+          publishedAt: a.publishedAt ?? undefined,
+          rawPayload: a,
+        });
+      }
     }
   } catch (e) {
     const message = e instanceof Error ? e.message : "Failed to fetch from News API.";
