@@ -2,6 +2,8 @@ import { Suspense } from "react";
 import Link from "next/link";
 import DashboardFilters from "./DashboardFilters";
 import AnalyzeButton from "./AnalyzeButton";
+import FetchNewsButton from "./FetchNewsButton";
+import { getCategoryTagClass } from "@/lib/categories";
 import { hasSupabaseDb } from "@/lib/supabase-server";
 import { getArticlesSupabase, getSourcesSupabase } from "@/lib/data-supabase";
 
@@ -29,15 +31,11 @@ type ArticleForList = {
   source: { name: string };
 };
 
-async function getArticlesForList(
-  q: string | null,
-  category: string | null
-): Promise<{ articles: ArticleForList[]; total: number }> {
+async function getArticlesForList(q: string | null): Promise<{ articles: ArticleForList[]; total: number }> {
   if (hasSupabaseDb()) {
     const { articles, total } = await getArticlesSupabase({
       limit: 50,
       offset: 0,
-      category: category ?? undefined,
       q: q ?? undefined,
     });
     const sources = await getSourcesSupabase();
@@ -52,7 +50,6 @@ async function getArticlesForList(
   }
   const params = new URLSearchParams({ limit: "20" });
   if (q) params.set("q", q);
-  if (category) params.set("category", category);
   const res = await fetch(`${base}/api/articles?${params}`, { cache: "no-store" });
   if (!res.ok) throw new Error("Could not load articles");
   const data = (await res.json()) as { articles: ArticleForList[]; pagination: { total: number } };
@@ -61,17 +58,15 @@ async function getArticlesForList(
 
 async function ArticlesList({
   q,
-  category,
   hasAnalyzeProvider,
 }: {
   q: string | null;
-  category: string | null;
   hasAnalyzeProvider: boolean;
 }) {
   let articles: ArticleForList[];
   let total: number;
   try {
-    const data = await getArticlesForList(q, category);
+    const data = await getArticlesForList(q);
     articles = data.articles;
     total = data.total;
   } catch {
@@ -85,8 +80,8 @@ async function ArticlesList({
   if (articles.length === 0) {
     return (
       <p className="text-muted-foreground text-sm">
-        {q || category
-          ? "No articles match the filters."
+        {q
+          ? "No articles match your search."
           : "No articles yet. Click “Fetch news now” above to load headlines (add NEWS_API_KEY to .env locally or in Vercel)."}
       </p>
     );
@@ -121,10 +116,7 @@ async function ArticlesList({
                 {(a.categories?.length > 0 || a.entities?.length > 0 || a.topics?.length > 0) && (
                   <div className="mt-3 flex flex-wrap gap-1.5 text-xs">
                     {a.categories?.slice(0, 3).map((c) => (
-                      <span
-                        key={c}
-                        className="rounded-md border border-primary/30 bg-primary/10 px-2 py-0.5 font-medium text-primary"
-                      >
+                      <span key={c} className={getCategoryTagClass(c)}>
                         {c}
                       </span>
                     ))}
@@ -216,11 +208,10 @@ async function ArticlesList({
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; category?: string }>;
+  searchParams: Promise<{ q?: string }>;
 }) {
   const params = await searchParams;
   const q = params.q ?? null;
-  const category = params.category ?? null;
 
   return (
     <div className="min-h-screen gradient-mesh">
@@ -252,8 +243,12 @@ export default async function DashboardPage({
             Opportunities and implications for shareholders, investors, and business leaders.
           </p>
         </div>
+        <p className="mb-4 text-sm text-muted-foreground">
+          This feed scrapes and updates regularly. We keep adding new articles so you stay on top of what matters.
+        </p>
         <div className="flex flex-wrap items-end gap-3">
           <DashboardFilters />
+          <FetchNewsButton />
         </div>
         <Suspense
           fallback={
@@ -263,7 +258,6 @@ export default async function DashboardPage({
           <div className="mt-6">
             <ArticlesList
               q={q}
-              category={category}
               hasAnalyzeProvider={!!(process.env.GROQ_API_KEY || process.env.OPENAI_API_KEY)}
             />
           </div>

@@ -59,7 +59,10 @@ export async function getArticlesSupabase(options: {
     if (blobFeed && blobFeed.length > 0) {
       let list = blobFeed;
       if (options.sourceId) list = list.filter((a) => a.sourceId === options.sourceId);
-      if (options.category) list = list.filter(matchCategory);
+      if (options.category) {
+        const idsWithCategory = await getArticleIdsByCategorySupabase(options.category);
+        list = list.filter((a) => idsWithCategory.has(a.id));
+      }
       if (options.q?.trim()) {
         const q = options.q.trim().toLowerCase();
         list = list.filter((a) => a.title?.toLowerCase().includes(q) || (a.summary && a.summary.toLowerCase().includes(q)));
@@ -84,7 +87,10 @@ export async function getArticlesSupabase(options: {
     if (kvFeed && kvFeed.length > 0) {
       let list = kvFeed;
       if (options.sourceId) list = list.filter((a) => a.sourceId === options.sourceId);
-      if (options.category) list = list.filter(matchCategory);
+      if (options.category) {
+        const idsWithCategory = await getArticleIdsByCategorySupabase(options.category);
+        list = list.filter((a) => idsWithCategory.has(a.id));
+      }
       if (options.q?.trim()) {
         const q = options.q.trim().toLowerCase();
         list = list.filter((a) => a.title?.toLowerCase().includes(q) || (a.summary && a.summary.toLowerCase().includes(q)));
@@ -277,6 +283,19 @@ export async function ingestArticlesSupabase(
   }
 
   return { created, skipped, total: articles.length, newArticleIds };
+}
+
+/** When using Blob/KV, categories live only in Supabase. Return set of article IDs that have the given category. */
+async function getArticleIdsByCategorySupabase(category: string): Promise<Set<string>> {
+  const supabase = getSupabaseAdmin();
+  if (!supabase) return new Set();
+  const sb = supabase as any;
+  const { data, error } = await sb
+    .from(ARTICLE_TABLE)
+    .select("id")
+    .contains("categories", [category]);
+  if (error || !Array.isArray(data)) return new Set();
+  return new Set((data as { id: string }[]).map((r) => r.id));
 }
 
 /** Fetch analysis fields for multiple article ids (for merging into Blob/Kv feed). */
