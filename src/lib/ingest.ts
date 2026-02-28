@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { Prisma } from "@prisma/client";
 
 export type IngestArticle = {
   externalId?: string;
@@ -62,7 +63,10 @@ export async function ingestArticles(articles: IngestArticle[]): Promise<{ creat
         summary: a.summary ?? null,
         url: a.url ?? null,
         publishedAt,
-        rawPayload: a.rawPayload ? (a.rawPayload as object) : null,
+        rawPayload:
+          a.rawPayload == null
+            ? undefined
+            : (a.rawPayload as Prisma.InputJsonValue),
       },
     });
     created++;

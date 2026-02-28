@@ -3,6 +3,8 @@ import Link from "next/link";
 import DashboardFilters from "./DashboardFilters";
 import AnalyzeButton from "./AnalyzeButton";
 
+export const dynamic = "force-dynamic";
+
 const base =
   process.env.VERCEL_URL != null
     ? `https://${process.env.VERCEL_URL}`

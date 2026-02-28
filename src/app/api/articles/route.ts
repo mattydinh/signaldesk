@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { Prisma } from "@prisma/client";
 
+export const dynamic = "force-dynamic";
+
 /**
  * GET /api/articles — list articles (paginated, full-text search, filter by source)
  * Query: page, limit, sourceId, q (PostgreSQL full-text search on title/summary)
@@ -35,7 +37,7 @@ export async function GET(request: NextRequest) {
       OR?: Array<{ title?: { contains: string; mode: "insensitive" }; summary?: { contains: string; mode: "insensitive" } }>;
     };
     const where: Where = {};
-    let total: number;
+    let total = 0;
     let idsToFetch: string[] | null = null;
 
     if (articleIds !== null) {
