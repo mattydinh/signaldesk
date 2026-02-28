@@ -15,19 +15,19 @@ export const ARTICLE_CATEGORIES = [
 
 export type ArticleCategory = (typeof ARTICLE_CATEGORIES)[number];
 
-/** Color-coded tag styles per category (bg, text, border). */
+/** Color-coded tag styles per category (bg, text, border) — distinct, readable palette. */
 const CATEGORY_TAG_STYLES: Record<string, string> = {
-  Finance: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-400/40",
-  Crypto: "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-400/40",
-  Political: "bg-blue-500/15 text-blue-700 dark:text-blue-300 border-blue-400/40",
-  Geopolitics: "bg-violet-500/15 text-violet-700 dark:text-violet-300 border-violet-400/40",
-  "War & Conflict": "bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-400/40",
-  Technology: "bg-cyan-500/15 text-cyan-700 dark:text-cyan-300 border-cyan-400/40",
-  Regulation: "bg-slate-500/15 text-slate-700 dark:text-slate-300 border-slate-400/40",
-  Markets: "bg-green-500/15 text-green-700 dark:text-green-300 border-green-400/40",
-  Energy: "bg-orange-500/15 text-orange-700 dark:text-orange-300 border-orange-400/40",
-  Healthcare: "bg-teal-500/15 text-teal-700 dark:text-teal-300 border-teal-400/40",
-  Other: "bg-muted text-muted-foreground border-border",
+  Markets: "bg-indigo-500/20 text-indigo-800 dark:text-indigo-200 border-indigo-400/50",
+  Finance: "bg-emerald-500/20 text-emerald-800 dark:text-emerald-200 border-emerald-400/50",
+  Technology: "bg-sky-500/20 text-sky-800 dark:text-sky-200 border-sky-400/50",
+  Crypto: "bg-amber-500/20 text-amber-800 dark:text-amber-200 border-amber-400/50",
+  Political: "bg-blue-500/20 text-blue-800 dark:text-blue-200 border-blue-400/50",
+  Geopolitics: "bg-violet-500/20 text-violet-800 dark:text-violet-200 border-violet-400/50",
+  "War & Conflict": "bg-rose-500/20 text-rose-800 dark:text-rose-200 border-rose-400/50",
+  Regulation: "bg-slate-500/20 text-slate-700 dark:text-slate-300 border-slate-400/50",
+  Energy: "bg-orange-500/20 text-orange-800 dark:text-orange-200 border-orange-400/50",
+  Healthcare: "bg-teal-500/20 text-teal-800 dark:text-teal-200 border-teal-400/50",
+  Other: "bg-zinc-500/15 text-zinc-600 dark:text-zinc-400 border-zinc-400/40",
 };
 
 export function getCategoryTagClass(category: string): string {
