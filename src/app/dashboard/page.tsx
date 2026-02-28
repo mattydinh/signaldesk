@@ -3,7 +3,7 @@ import Link from "next/link";
 import DashboardFilters from "./DashboardFilters";
 import AnalyzeButton from "./AnalyzeButton";
 import FetchNewsButton from "./FetchNewsButton";
-import { getCategoryTagClass, inferCategoriesFromText } from "@/lib/categories";
+import { getCategoryTagStyle, inferCategoriesFromText } from "@/lib/categories";
 import { hasSupabaseDb } from "@/lib/supabase-server";
 import { getArticlesSupabase, getSourcesSupabase } from "@/lib/data-supabase";
 
@@ -114,11 +114,22 @@ async function ArticlesList({
                   </p>
                 )}
                 <div className="mt-3 flex flex-wrap gap-1.5 text-xs">
-                  {((a.categories?.length ? a.categories : inferCategoriesFromText(a.title ?? null, a.summary ?? null)).slice(0, 3)).map((c) => (
-                    <span key={c} className={getCategoryTagClass(c)}>
-                      {c}
-                    </span>
-                  ))}
+                  {((a.categories?.length ? a.categories : inferCategoriesFromText(a.title ?? null, a.summary ?? null)).slice(0, 3)).map((c) => {
+                    const tagStyle = getCategoryTagStyle(c);
+                    return (
+                      <span
+                        key={c}
+                        className="rounded-md border px-2 py-0.5 font-medium"
+                        style={{
+                          backgroundColor: tagStyle.backgroundColor,
+                          color: tagStyle.color,
+                          borderColor: tagStyle.borderColor,
+                        }}
+                      >
+                        {c}
+                      </span>
+                    );
+                  })}
                   {a.entities?.slice(0, 4).map((e) => (
                       <span
                         key={e}

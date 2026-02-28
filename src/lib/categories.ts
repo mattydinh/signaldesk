@@ -15,25 +15,25 @@ export const ARTICLE_CATEGORIES = [
 
 export type ArticleCategory = (typeof ARTICLE_CATEGORIES)[number];
 
-/** Color-coded tag styles — high contrast in dark mode so tags pop. */
-const CATEGORY_TAG_STYLES: Record<string, string> = {
-  Markets: "bg-indigo-500/30 text-indigo-300 border-indigo-400/60",
-  Finance: "bg-emerald-500/30 text-emerald-300 border-emerald-400/60",
-  Technology: "bg-sky-500/30 text-sky-300 border-sky-400/60",
-  Crypto: "bg-amber-500/30 text-amber-300 border-amber-400/60",
-  Political: "bg-blue-500/30 text-blue-300 border-blue-400/60",
-  Geopolitics: "bg-violet-500/30 text-violet-300 border-violet-400/60",
-  "War & Conflict": "bg-rose-500/30 text-rose-300 border-rose-400/60",
-  Regulation: "bg-slate-500/25 text-slate-300 border-slate-400/50",
-  Energy: "bg-orange-500/30 text-orange-300 border-orange-400/60",
-  Healthcare: "bg-teal-500/30 text-teal-300 border-teal-400/60",
-  Other: "bg-zinc-500/25 text-zinc-400 border-zinc-400/50",
+/** Inline styles per category so colors always apply (avoids Tailwind purging dynamic classes). */
+export type CategoryTagStyle = { backgroundColor: string; color: string; borderColor: string };
+
+const CATEGORY_TAG_STYLES: Record<string, CategoryTagStyle> = {
+  Markets: { backgroundColor: "rgba(99, 102, 241, 0.35)", color: "#a5b4fc", borderColor: "rgba(129, 140, 248, 0.6)" },
+  Finance: { backgroundColor: "rgba(16, 185, 129, 0.35)", color: "#6ee7b7", borderColor: "rgba(52, 211, 153, 0.6)" },
+  Technology: { backgroundColor: "rgba(14, 165, 233, 0.35)", color: "#7dd3fc", borderColor: "rgba(56, 189, 248, 0.6)" },
+  Crypto: { backgroundColor: "rgba(245, 158, 11, 0.35)", color: "#fcd34d", borderColor: "rgba(251, 191, 36, 0.6)" },
+  Political: { backgroundColor: "rgba(59, 130, 246, 0.35)", color: "#93c5fd", borderColor: "rgba(96, 165, 250, 0.6)" },
+  Geopolitics: { backgroundColor: "rgba(139, 92, 246, 0.35)", color: "#c4b5fd", borderColor: "rgba(167, 139, 250, 0.6)" },
+  "War & Conflict": { backgroundColor: "rgba(244, 63, 94, 0.35)", color: "#fda4af", borderColor: "rgba(251, 113, 133, 0.6)" },
+  Regulation: { backgroundColor: "rgba(100, 116, 139, 0.3)", color: "#cbd5e1", borderColor: "rgba(148, 163, 184, 0.5)" },
+  Energy: { backgroundColor: "rgba(249, 115, 22, 0.35)", color: "#fdba74", borderColor: "rgba(251, 146, 60, 0.6)" },
+  Healthcare: { backgroundColor: "rgba(20, 184, 166, 0.35)", color: "#5eead4", borderColor: "rgba(45, 212, 191, 0.6)" },
+  Other: { backgroundColor: "rgba(113, 113, 122, 0.25)", color: "#a1a1aa", borderColor: "rgba(161, 161, 170, 0.5)" },
 };
 
-export function getCategoryTagClass(category: string): string {
-  const base = "rounded-md border px-2 py-0.5 text-xs font-medium";
-  const style = CATEGORY_TAG_STYLES[category] ?? CATEGORY_TAG_STYLES.Other;
-  return `${base} ${style}`;
+export function getCategoryTagStyle(category: string): CategoryTagStyle {
+  return CATEGORY_TAG_STYLES[category] ?? CATEGORY_TAG_STYLES.Other;
 }
 
 /** Keyword rules to infer 1–3 categories when AI analysis hasn't run. Order matters (first match wins for tie-break). */
