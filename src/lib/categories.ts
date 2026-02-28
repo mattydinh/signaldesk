@@ -15,19 +15,19 @@ export const ARTICLE_CATEGORIES = [
 
 export type ArticleCategory = (typeof ARTICLE_CATEGORIES)[number];
 
-/** Color-coded tag styles per category (bg, text, border) — distinct, readable palette. */
+/** Color-coded tag styles — high contrast in dark mode so tags pop. */
 const CATEGORY_TAG_STYLES: Record<string, string> = {
-  Markets: "bg-indigo-500/20 text-indigo-800 dark:text-indigo-200 border-indigo-400/50",
-  Finance: "bg-emerald-500/20 text-emerald-800 dark:text-emerald-200 border-emerald-400/50",
-  Technology: "bg-sky-500/20 text-sky-800 dark:text-sky-200 border-sky-400/50",
-  Crypto: "bg-amber-500/20 text-amber-800 dark:text-amber-200 border-amber-400/50",
-  Political: "bg-blue-500/20 text-blue-800 dark:text-blue-200 border-blue-400/50",
-  Geopolitics: "bg-violet-500/20 text-violet-800 dark:text-violet-200 border-violet-400/50",
-  "War & Conflict": "bg-rose-500/20 text-rose-800 dark:text-rose-200 border-rose-400/50",
-  Regulation: "bg-slate-500/20 text-slate-700 dark:text-slate-300 border-slate-400/50",
-  Energy: "bg-orange-500/20 text-orange-800 dark:text-orange-200 border-orange-400/50",
-  Healthcare: "bg-teal-500/20 text-teal-800 dark:text-teal-200 border-teal-400/50",
-  Other: "bg-zinc-500/15 text-zinc-600 dark:text-zinc-400 border-zinc-400/40",
+  Markets: "bg-indigo-500/30 text-indigo-300 border-indigo-400/60",
+  Finance: "bg-emerald-500/30 text-emerald-300 border-emerald-400/60",
+  Technology: "bg-sky-500/30 text-sky-300 border-sky-400/60",
+  Crypto: "bg-amber-500/30 text-amber-300 border-amber-400/60",
+  Political: "bg-blue-500/30 text-blue-300 border-blue-400/60",
+  Geopolitics: "bg-violet-500/30 text-violet-300 border-violet-400/60",
+  "War & Conflict": "bg-rose-500/30 text-rose-300 border-rose-400/60",
+  Regulation: "bg-slate-500/25 text-slate-300 border-slate-400/50",
+  Energy: "bg-orange-500/30 text-orange-300 border-orange-400/60",
+  Healthcare: "bg-teal-500/30 text-teal-300 border-teal-400/60",
+  Other: "bg-zinc-500/25 text-zinc-400 border-zinc-400/50",
 };
 
 export function getCategoryTagClass(category: string): string {

@@ -3,7 +3,7 @@ import Link from "next/link";
 import DashboardFilters from "./DashboardFilters";
 import AnalyzeButton from "./AnalyzeButton";
 import FetchNewsButton from "./FetchNewsButton";
-import { getCategoryTagClass } from "@/lib/categories";
+import { getCategoryTagClass, inferCategoriesFromText } from "@/lib/categories";
 import { hasSupabaseDb } from "@/lib/supabase-server";
 import { getArticlesSupabase, getSourcesSupabase } from "@/lib/data-supabase";
 
@@ -114,8 +114,8 @@ async function ArticlesList({
                   </p>
                 )}
                 <div className="mt-3 flex flex-wrap gap-1.5 text-xs">
-                  {(a.categories?.length ? a.categories.slice(0, 3) : ["Uncategorized"]).map((c) => (
-                    <span key={c} className={getCategoryTagClass(c === "Uncategorized" ? "Other" : c)}>
+                  {((a.categories?.length ? a.categories : inferCategoriesFromText(a.title ?? null, a.summary ?? null)).slice(0, 3)).map((c) => (
+                    <span key={c} className={getCategoryTagClass(c)}>
                       {c}
                     </span>
                   ))}
