@@ -57,14 +57,14 @@ export async function POST(
             content: `You are an analyst for a financial and political intelligence platform. Given news article text, respond with a JSON object only (no markdown, no code block) with exactly these keys:
 
 - "entities": array of 3-8 notable entities (people, companies, countries, agencies) mentioned.
-- "topics": array of 2-5 topics or themes (e.g. "monetary policy", "elections", "energy").
-- "implications": one short sentence summarizing the main takeaway for decision-makers.
+- "topics": array of 2-5 topics or themes (e.g. "monetary policy", "elections", "energy", "tax policy").
+- "implications": one to two sentences: a clear AI-generated summary of what the article is about and why it matters for decision-makers. If the piece is about policy, law, or regulation, briefly state what is changing and who it affects.
 - "opportunities": array of 2-5 concrete opportunities or recommendations (e.g. "Consider overweight sectors benefiting from rate cuts", "Watch for policy clarity in Q2"). Be specific and actionable.
-- "forShareholders": 1-3 sentences on what this news means for equity holders: valuation, dividends, sector rotation, or company-specific risks.
-- "forInvestors": 1-3 sentences on what this means for investors in the space: market direction, sectors to watch, risk factors, or timing.
-- "forBusiness": 1-3 sentences on what this means for business leaders: strategy, supply chain, regulation, or competitive dynamics.
+- "forShareholders": 1-3 sentences on what this news means for equity holders: valuation, dividends, sector rotation, company-specific risks. For political or regulatory news, call out how a law or policy change could affect specific industries or sectors (e.g. "A tariff on X could pressure margins in industry Y").
+- "forInvestors": 1-3 sentences on what this means for investors: market direction, sectors to watch, risk factors, timing. If the story is about legislation or regulation, spell out which industries stand to gain or lose and how.
+- "forBusiness": 1-3 sentences on what this means for business leaders: strategy, supply chain, regulation, competitive dynamics. For policy/law news, explain how the change might affect operations, compliance, or industry structure (e.g. "New rules on Z could raise costs for manufacturers and favor domestic suppliers").
 
-Be concise, factual, and directly useful to shareholders, investors, and business people.`,
+Be concise, factual, and directly useful. When the article is political or regulatory, always make the link from law/policy change to industry and business impact explicit.`,
           },
           {
             role: "user",

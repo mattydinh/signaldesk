@@ -60,6 +60,16 @@ export async function getArticlesSupabase(options: {
       }
       const total = list.length;
       const articles = list.slice(options.offset, options.offset + options.limit);
+      const realIds = articles.filter((a) => !a.id.startsWith("cache-")).map((a) => a.id);
+      if (realIds.length > 0) {
+        const analysisMap = await getAnalysisBatchSupabase(realIds);
+        const merged = articles.map((a) => {
+          const analysis = analysisMap.get(a.id);
+          if (!analysis) return a;
+          return { ...a, ...analysis };
+        });
+        return { articles: merged, total };
+      }
       return { articles, total };
     }
   }
@@ -74,6 +84,16 @@ export async function getArticlesSupabase(options: {
       }
       const total = list.length;
       const articles = list.slice(options.offset, options.offset + options.limit);
+      const realIds = articles.filter((a) => !a.id.startsWith("cache-")).map((a) => a.id);
+      if (realIds.length > 0) {
+        const analysisMap = await getAnalysisBatchSupabase(realIds);
+        const merged = articles.map((a) => {
+          const analysis = analysisMap.get(a.id);
+          if (!analysis) return a;
+          return { ...a, ...analysis };
+        });
+        return { articles: merged, total };
+      }
       return { articles, total };
     }
   }
@@ -146,15 +166,41 @@ function slugify(name: string): string {
     .replace(/[^a-z0-9-]/g, "");
 }
 
+function toCachedArticle(
+  a: IngestArticleInput,
+  id: string,
+  sourceId: string
+): CachedArticle {
+  return {
+    id,
+    sourceId,
+    title: a.title,
+    summary: a.summary ?? null,
+    url: a.url ?? null,
+    publishedAt: a.publishedAt ?? null,
+    externalId: a.externalId ?? null,
+    entities: [],
+    topics: [],
+    opportunities: [],
+    implications: null,
+    forShareholders: null,
+    forInvestors: null,
+    forBusiness: null,
+    sourceName: a.sourceName,
+  };
+}
+
 export async function ingestArticlesSupabase(
   articles: IngestArticleInput[]
-): Promise<{ created: number; skipped: number; total: number }> {
+): Promise<{ created: number; skipped: number; total: number; newArticleIds: string[] }> {
   const supabase = getSupabaseAdmin();
-  if (!supabase) return { created: 0, skipped: 0, total: articles.length };
+  if (!supabase) return { created: 0, skipped: 0, total: articles.length, newArticleIds: [] };
   const sb = supabase as any;
 
   let created = 0;
   let skipped = 0;
+  const newArticleIds: string[] = [];
+  const feedEntries: CachedArticle[] = [];
 
   for (const a of articles) {
     if (!a.title || !a.sourceName) {
@@ -182,52 +228,77 @@ export async function ingestArticlesSupabase(
 
     if (a.externalId) {
       const { data: existing } = await sb.from(ARTICLE_TABLE).select("id").eq("sourceId", sourceId).eq("externalId", a.externalId).maybeSingle();
-      if ((existing as { id?: string })?.id) {
+      const existingArticleId = (existing as { id?: string })?.id;
+      if (existingArticleId) {
         skipped++;
+        feedEntries.push(toCachedArticle(a, existingArticleId, sourceId));
         continue;
       }
     }
 
     const publishedAt = a.publishedAt ? new Date(a.publishedAt).toISOString() : null;
-    const { error: insertErr } = await sb.from(ARTICLE_TABLE).insert({
-      sourceId,
-      externalId: a.externalId ?? null,
-      title: a.title,
-      summary: a.summary ?? null,
-      url: a.url ?? null,
-      publishedAt,
-      rawPayload: a.rawPayload ?? null,
-    });
-    if (insertErr) {
+    const { data: newArticle, error: insertErr } = await sb
+      .from(ARTICLE_TABLE)
+      .insert({
+        sourceId,
+        externalId: a.externalId ?? null,
+        title: a.title,
+        summary: a.summary ?? null,
+        url: a.url ?? null,
+        publishedAt,
+        rawPayload: a.rawPayload ?? null,
+      })
+      .select("id")
+      .single();
+    if (insertErr || !(newArticle as { id?: string })?.id) {
       console.error("[data-supabase] insert article", insertErr);
       skipped++;
       continue;
     }
+    const newId = (newArticle as { id: string }).id;
     created++;
+    newArticleIds.push(newId);
+    feedEntries.push(toCachedArticle(a, newId, sourceId));
   }
 
-  const cacheEntries: CachedArticle[] = articles.map((a, i) => ({
-    id: `cache-${i}-${(a.url ?? a.title).slice(0, 40)}`,
-    sourceId: "",
-    title: a.title,
-    summary: a.summary ?? null,
-    url: a.url ?? null,
-    publishedAt: a.publishedAt ?? null,
-    externalId: a.externalId ?? null,
-    entities: [],
-    topics: [],
-    opportunities: [],
-    implications: null,
-    forShareholders: null,
-    forInvestors: null,
-    forBusiness: null,
-    sourceName: a.sourceName,
-  }));
-  setFeedCache(cacheEntries);
-  if (hasBlobFeed()) await writeFeedToBlob(cacheEntries);
-  if (hasKvFeed()) await writeFeedToKv(cacheEntries);
+  if (feedEntries.length > 0) {
+    setFeedCache(feedEntries);
+    if (hasBlobFeed()) await writeFeedToBlob(feedEntries);
+    if (hasKvFeed()) await writeFeedToKv(feedEntries);
+  }
 
-  return { created, skipped, total: articles.length };
+  return { created, skipped, total: articles.length, newArticleIds };
+}
+
+/** Fetch analysis fields for multiple article ids (for merging into Blob/Kv feed). */
+async function getAnalysisBatchSupabase(
+  ids: string[]
+): Promise<Map<string, Pick<ArticleRow, "entities" | "topics" | "opportunities" | "implications" | "forShareholders" | "forInvestors" | "forBusiness">>> {
+  if (ids.length === 0) return new Map();
+  const supabase = getSupabaseAdmin();
+  if (!supabase) return new Map();
+  const sb = supabase as any;
+  const { data, error } = await sb
+    .from(ARTICLE_TABLE)
+    .select("id, entities, topics, opportunities, implications, forShareholders, forInvestors, forBusiness")
+    .in("id", ids);
+  if (error || !Array.isArray(data)) return new Map();
+  const map = new Map<
+    string,
+    Pick<ArticleRow, "entities" | "topics" | "opportunities" | "implications" | "forShareholders" | "forInvestors" | "forBusiness">
+  >();
+  for (const row of data as Array<ArticleRow & { id: string }>) {
+    map.set(row.id, {
+      entities: row.entities ?? [],
+      topics: row.topics ?? [],
+      opportunities: row.opportunities ?? [],
+      implications: row.implications ?? null,
+      forShareholders: row.forShareholders ?? null,
+      forInvestors: row.forInvestors ?? null,
+      forBusiness: row.forBusiness ?? null,
+    });
+  }
+  return map;
 }
 
 export async function getArticleByIdSupabase(id: string): Promise<(ArticleRow & { source: { name: string } }) | null> {

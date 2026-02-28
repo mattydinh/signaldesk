@@ -22,13 +22,19 @@ function slugify(name: string): string {
     .replace(/[^a-z0-9-]/g, "");
 }
 
-export async function ingestArticles(articles: IngestArticle[]): Promise<{ created: number; skipped: number; total: number }> {
+export async function ingestArticles(articles: IngestArticle[]): Promise<{
+  created: number;
+  skipped: number;
+  total: number;
+  newArticleIds: string[];
+}> {
   if (hasSupabaseDb()) {
     return ingestArticlesSupabase(articles);
   }
 
   let created = 0;
   let skipped = 0;
+  const newArticleIds: string[] = [];
 
   for (const a of articles) {
     if (!a.title || !a.sourceName) {
@@ -61,7 +67,7 @@ export async function ingestArticles(articles: IngestArticle[]): Promise<{ creat
       continue;
     }
 
-    await prisma.article.create({
+    const newArticle = await prisma.article.create({
       data: {
         sourceId: source.id,
         externalId: a.externalId ?? null,
@@ -76,7 +82,8 @@ export async function ingestArticles(articles: IngestArticle[]): Promise<{ creat
       },
     });
     created++;
+    newArticleIds.push(newArticle.id);
   }
 
-  return { created, skipped, total: articles.length };
+  return { created, skipped, total: articles.length, newArticleIds };
 }

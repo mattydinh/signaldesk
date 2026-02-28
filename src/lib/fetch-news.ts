@@ -1,7 +1,7 @@
 import { ingestArticles, type IngestArticle } from "@/lib/ingest";
 
 export type FetchNewsResult =
-  | { ok: true; created: number; skipped: number; total: number }
+  | { ok: true; created: number; skipped: number; total: number; newArticleIds: string[] }
   | { ok: false; error: string };
 
 /**
@@ -55,12 +55,12 @@ export async function fetchAndIngestNews(): Promise<FetchNewsResult> {
   }
 
   if (allArticles.length === 0) {
-    return { ok: true, created: 0, skipped: 0, total: 0 };
+    return { ok: true, created: 0, skipped: 0, total: 0, newArticleIds: [] };
   }
 
   try {
     const result = await ingestArticles(allArticles);
-    return { ok: true, ...result };
+    return { ok: true, ...result, newArticleIds: result.newArticleIds ?? [] };
   } catch (e) {
     const message = e instanceof Error ? e.message : "Database ingest failed.";
     console.error("[fetch-news] ingest error", e);
