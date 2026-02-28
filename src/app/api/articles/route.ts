@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { Prisma } from "@prisma/client";
+import { hasSupabaseDb } from "@/lib/supabase-server";
+import { getArticlesSupabase, getSourcesSupabase } from "@/lib/data-supabase";
 
 export const dynamic = "force-dynamic";
 
 /**
  * GET /api/articles — list articles (paginated, full-text search, filter by source)
- * Query: page, limit, sourceId, q (PostgreSQL full-text search on title/summary)
+ * Query: page, limit, sourceId, q (PostgreSQL full-text search on title/summary, or ilike when using Supabase)
  */
 export async function GET(request: NextRequest) {
   try {
@@ -14,8 +16,27 @@ export async function GET(request: NextRequest) {
     const page = Math.max(1, parseInt(searchParams.get("page") ?? "1", 10));
     const limit = Math.min(50, Math.max(1, parseInt(searchParams.get("limit") ?? "20", 10)));
     const sourceId = searchParams.get("sourceId") ?? undefined;
-    const q = searchParams.get("q")?.trim();
+    const q = searchParams.get("q")?.trim() ?? undefined;
     const offset = (page - 1) * limit;
+
+    if (hasSupabaseDb()) {
+      const { articles, total } = await getArticlesSupabase({
+        limit,
+        offset,
+        sourceId,
+        q,
+      });
+      const sources = await getSourcesSupabase();
+      const sourceMap = new Map(sources.map((s) => [s.id, s]));
+      const articlesWithSource = articles.map((a) => ({
+        ...a,
+        source: { name: sourceMap.get(a.sourceId)?.name ?? "Unknown" },
+      }));
+      return NextResponse.json({
+        articles: articlesWithSource,
+        pagination: { page, limit, total, pages: Math.ceil(total / limit) },
+      });
+    }
 
     let articleIds: string[] | null = null;
     if (q) {

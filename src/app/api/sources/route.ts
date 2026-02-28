@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { hasSupabaseDb } from "@/lib/supabase-server";
+import { getSourcesSupabase } from "@/lib/data-supabase";
 
 export const dynamic = "force-dynamic";
 
@@ -8,6 +10,10 @@ export const dynamic = "force-dynamic";
  */
 export async function GET() {
   try {
+    if (hasSupabaseDb()) {
+      const sources = await getSourcesSupabase();
+      return NextResponse.json({ sources });
+    }
     const sources = await prisma.source.findMany({
       orderBy: { name: "asc" },
       select: { id: true, name: true, slug: true },

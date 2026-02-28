@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { hasSupabaseDb } from "@/lib/supabase-server";
+import { getArticleByIdSupabase, updateArticleAnalysisSupabase } from "@/lib/data-supabase";
 
 /**
  * POST /api/articles/[id]/analyze
@@ -19,10 +21,15 @@ export async function POST(
   }
 
   const { id } = await params;
-  const article = await prisma.article.findUnique({
-    where: { id },
-    include: { source: true },
-  });
+  let article: { title: string; summary: string | null; source: { name: string } } | null = null;
+  if (hasSupabaseDb()) {
+    article = await getArticleByIdSupabase(id);
+  } else {
+    article = await prisma.article.findUnique({
+      where: { id },
+      include: { source: true },
+    });
+  }
   if (!article) {
     return NextResponse.json({ error: "Article not found." }, { status: 404 });
   }
@@ -116,18 +123,30 @@ Be concise, factual, and directly useful to shareholders, investors, and busines
     const forInvestors = typeof parsed.forInvestors === "string" ? parsed.forInvestors.trim() : null;
     const forBusiness = typeof parsed.forBusiness === "string" ? parsed.forBusiness.trim() : null;
 
-    await prisma.article.update({
-      where: { id },
-      data: {
+    if (hasSupabaseDb()) {
+      await updateArticleAnalysisSupabase(id, {
         entities,
         topics,
-        implications,
         opportunities,
+        implications,
         forShareholders,
         forInvestors,
         forBusiness,
-      },
-    });
+      });
+    } else {
+      await prisma.article.update({
+        where: { id },
+        data: {
+          entities,
+          topics,
+          implications,
+          opportunities,
+          forShareholders,
+          forInvestors,
+          forBusiness,
+        },
+      });
+    }
 
     return NextResponse.json({
       ok: true,

@@ -60,13 +60,19 @@ AI-powered financial & political intelligence platform. Ingests news from APIs, 
 
 1. Push repo to GitHub and import in [Vercel](https://vercel.com).
 2. **Database (required for /api/articles and dashboard):**
-   - **Recommended:** Install the [Supabase integration](https://vercel.com/integrations/supabase) for this Vercel project and connect your Supabase project. It sets **POSTGRES_PRISMA_URL** (and related vars) automatically; redeploy after connecting.
-   - **Or manually:** In **Vercel → Settings → Environment Variables**, add **POSTGRES_PRISMA_URL** with your Supabase **pooler** URI (port 6543, from Supabase → Project Settings → Database → Connection string → URI). Do not use the direct connection (port 5432); serverless often can’t reach it.
+   - **Recommended:** Install the [Supabase integration](https://vercel.com/integrations/supabase) and connect your Supabase project. The app will use **Supabase’s REST API** (SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY) for all DB access when those are set, avoiding Postgres connection/pooler issues on Vercel. No need to configure POSTGRES_PRISMA_URL if the integration sets the Supabase keys.
+   - **Or with Prisma:** Set **POSTGRES_PRISMA_URL** to your Supabase **pooler** URI (port 6543). The app injects `?pgbouncer=true` automatically for pooler compatibility.
+   - If you see "relation does not exist" with the REST API, your DB may use lowercase table names. Set **SUPABASE_SOURCE_TABLE**=source and **SUPABASE_ARTICLE_TABLE**=article in Vercel (optional).
    - If your Supabase project is **paused** (free tier), restore it in the Supabase dashboard.
 3. Add other env vars as needed: **NEWS_API_KEY**, **CRON_SECRET**, **OPENAI_API_KEY**, **INGEST_API_KEY**, **DASHBOARD_PASSWORD**.
 4. Deploy. Cron runs daily and calls **/api/cron/ingest-news** (set **CRON_SECRET** if you protect the endpoint).
 
 ### Troubleshooting DB on Vercel
 
-- **See what the app is using:** Open **https://your-app.vercel.app/api/debug-db**. It reports which env var is set (POSTGRES_PRISMA_URL or DATABASE_URL), pooler vs direct, and region. Use the Supabase integration so **POSTGRES_PRISMA_URL** is set automatically, then redeploy.
-- **Region:** Supabase Dashboard → Project Settings → General shows **Region** (e.g. East US → `us-east-1`). The pooler host must match: `aws-0-<region>.pooler.supabase.com`.
+- **See what the app is using:** Open **https://your-app.vercel.app/api/debug-db**. It reports which env var is set, pooler vs direct, and **region**. If you see "Tenant or user not found", the region in the URL often doesn’t match your project (e.g. URL says `us-west-2` but project is East US).
+- **Force us-east-1:** In **Vercel → Settings → Environment Variables**, set **POSTGRES_PRISMA_URL** to the pooler URI with **us-east-1** in the host. Format (replace `YOUR_PASSWORD` with your DB password; URL-encode special chars like `!` → `%21`):
+  ```
+  postgresql://postgres.lmqpijkepixbjgpwdojz:YOUR_PASSWORD@aws-0-us-east-1.pooler.supabase.com:6543/postgres?sslmode=require
+  ```
+  Save, then **Redeploy** the project.
+- **Region reference:** Supabase Dashboard → Project Settings → General shows **Region** (East US → `us-east-1`, West US (Oregon) → `us-west-2`). The pooler host must match: `aws-0-<region>.pooler.supabase.com`.

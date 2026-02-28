@@ -16,6 +16,7 @@ export async function GET() {
     });
   }
   const source = process.env.POSTGRES_PRISMA_URL ? "POSTGRES_PRISMA_URL" : "DATABASE_URL";
+  const usingSupabaseApi = !!(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
   const isPooler = url.includes("pooler.supabase.com");
   const isDirect = url.includes("db.") && url.includes("supabase.co");
   let region: string | null = null;
@@ -26,6 +27,7 @@ export async function GET() {
     ok: true,
     hasUrl: true,
     envVar: source,
+    usingSupabaseApi,
     usingPooler: isPooler,
     usingDirect: isDirect,
     region: region ?? (isPooler ? "could not parse" : null),

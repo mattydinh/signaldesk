@@ -1,5 +1,7 @@
 import { prisma } from "@/lib/db";
 import { Prisma } from "@prisma/client";
+import { hasSupabaseDb } from "@/lib/supabase-server";
+import { ingestArticlesSupabase } from "@/lib/data-supabase";
 
 export type IngestArticle = {
   externalId?: string;
@@ -21,6 +23,10 @@ function slugify(name: string): string {
 }
 
 export async function ingestArticles(articles: IngestArticle[]): Promise<{ created: number; skipped: number; total: number }> {
+  if (hasSupabaseDb()) {
+    return ingestArticlesSupabase(articles);
+  }
+
   let created = 0;
   let skipped = 0;
 
