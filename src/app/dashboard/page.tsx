@@ -113,14 +113,13 @@ async function ArticlesList({
                     {a.summary}
                   </p>
                 )}
-                {(a.categories?.length > 0 || a.entities?.length > 0 || a.topics?.length > 0) && (
-                  <div className="mt-3 flex flex-wrap gap-1.5 text-xs">
-                    {a.categories?.slice(0, 3).map((c) => (
-                      <span key={c} className={getCategoryTagClass(c)}>
-                        {c}
-                      </span>
-                    ))}
-                    {a.entities?.slice(0, 4).map((e) => (
+                <div className="mt-3 flex flex-wrap gap-1.5 text-xs">
+                  {(a.categories?.length ? a.categories.slice(0, 3) : ["Uncategorized"]).map((c) => (
+                    <span key={c} className={getCategoryTagClass(c === "Uncategorized" ? "Other" : c)}>
+                      {c}
+                    </span>
+                  ))}
+                  {a.entities?.slice(0, 4).map((e) => (
                       <span
                         key={e}
                         className="rounded-md bg-muted/80 px-2 py-0.5 text-muted-foreground"
@@ -136,8 +135,7 @@ async function ArticlesList({
                         {t}
                       </span>
                     ))}
-                  </div>
-                )}
+                </div>
                 {a.implications && (
                   <p className="mt-3 text-sm font-medium leading-relaxed text-primary">
                     {a.implications}
