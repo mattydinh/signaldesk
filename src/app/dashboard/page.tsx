@@ -195,9 +195,21 @@ export default async function DashboardPage({
           <Link href="/" className="text-xl font-bold">
             SignalDesk
           </Link>
-          <span className="text-sm text-muted-foreground">
-            Financial & Political Intelligence
-          </span>
+          <div className="flex items-center gap-4">
+            <Link href="/contact" className="text-sm text-muted-foreground hover:text-foreground">
+              Contact
+            </Link>
+            {process.env.DASHBOARD_PASSWORD ? (
+              <form action="/api/auth/logout" method="POST" className="inline">
+                <button type="submit" className="text-sm text-muted-foreground hover:text-foreground">
+                  Sign out
+                </button>
+              </form>
+            ) : null}
+            <span className="text-sm text-muted-foreground">
+              Financial & Political Intelligence
+            </span>
+          </div>
         </div>
       </header>
       <main className="mx-auto max-w-4xl px-6 py-8">

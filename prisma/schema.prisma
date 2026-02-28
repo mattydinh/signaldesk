@@ -45,3 +45,13 @@ model Article {
   @@index([publishedAt(sort: Desc)])
   @@index([createdAt(sort: Desc)])
 }
+
+model ContactSubmission {
+  id        String   @id @default(cuid())
+  name      String
+  email     String
+  message   String   @db.Text
+  createdAt DateTime @default(now())
+
+  @@index([createdAt(sort: Desc)])
+}

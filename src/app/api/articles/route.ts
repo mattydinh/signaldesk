@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { Prisma } from "@prisma/client";
 
 /**
  * GET /api/articles — list articles (paginated, full-text search, filter by source)
- * Query: page, limit, sourceId, q (search in title/summary)
+ * Query: page, limit, sourceId, q (PostgreSQL full-text search on title/summary)
  */
 export async function GET(request: NextRequest) {
   try {
@@ -14,29 +15,59 @@ export async function GET(request: NextRequest) {
     const q = searchParams.get("q")?.trim();
     const offset = (page - 1) * limit;
 
+    let articleIds: string[] | null = null;
+    if (q) {
+      const tokens = q.replace(/\s+/g, " ").trim().slice(0, 200);
+      if (tokens.length > 0) {
+        const rows = await prisma.$queryRaw<[{ id: string }]>`
+        SELECT id FROM "Article"
+        WHERE to_tsvector('english', coalesce(title, '') || ' ' || coalesce(summary, '')) @@ plainto_tsquery('english', ${tokens})
+        ${sourceId ? Prisma.sql`AND "sourceId" = ${sourceId}` : Prisma.empty}
+        ORDER BY "publishedAt" DESC NULLS LAST
+      `;
+        articleIds = rows.map((r) => r.id);
+      }
+    }
+
     type Where = {
       sourceId?: string;
+      id?: { in: string[] };
       OR?: Array<{ title?: { contains: string; mode: "insensitive" }; summary?: { contains: string; mode: "insensitive" } }>;
     };
     const where: Where = {};
-    if (sourceId) where.sourceId = sourceId;
-    if (q) {
-      where.OR = [
-        { title: { contains: q, mode: "insensitive" } },
-        { summary: { contains: q, mode: "insensitive" } },
-      ];
+    let total: number;
+    let idsToFetch: string[] | null = null;
+
+    if (articleIds !== null) {
+      total = articleIds.length;
+      if (total === 0) {
+        return NextResponse.json({
+          articles: [],
+          pagination: { page, limit, total: 0, pages: 0 },
+        });
+      }
+      idsToFetch = articleIds.slice(offset, offset + limit);
+      where.id = { in: idsToFetch };
+    } else {
+      if (sourceId) where.sourceId = sourceId;
+      if (q) {
+        where.OR = [
+          { title: { contains: q, mode: "insensitive" } },
+          { summary: { contains: q, mode: "insensitive" } },
+        ];
+      }
     }
 
-    const [articles, total] = await Promise.all([
+    const [articles, countResult] = await Promise.all([
       prisma.article.findMany({
-        where,
+        where: idsToFetch ? { id: { in: idsToFetch } } : where,
         include: { source: true },
         orderBy: { publishedAt: "desc" },
-        skip: offset,
-        take: limit,
+        ...(idsToFetch ? {} : { skip: offset, take: limit }),
       }),
-      prisma.article.count({ where }),
+      articleIds !== null ? Promise.resolve(null) : prisma.article.count({ where }),
     ]);
+    if (countResult !== null) total = countResult;
 
     return NextResponse.json({
       articles,

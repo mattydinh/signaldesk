@@ -7,12 +7,18 @@ export default function Home() {
       <p className="mt-2 text-muted-foreground text-center max-w-md">
         AI-powered financial & political intelligence platform.
       </p>
-      <div className="mt-8 flex gap-4">
+      <div className="mt-8 flex flex-wrap gap-4">
         <Link
           href="/dashboard"
           className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
         >
           Dashboard
+        </Link>
+        <Link
+          href="/contact"
+          className="rounded-md border border-input bg-background px-4 py-2 text-sm font-medium hover:bg-accent"
+        >
+          Contact / Demo
         </Link>
         <a
           href="/api/articles"

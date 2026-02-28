@@ -1,32 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/db";
+import { ingestArticles, type IngestArticle } from "@/lib/ingest";
 
 /**
  * News Ingestion API
  * POST /api/news/ingest — accept articles and store them
  * Body: { articles: IngestArticle[] }
+ * Optional header: x-api-key (must match INGEST_API_KEY if set)
  */
-
-export type IngestArticle = {
-  externalId?: string;
-  sourceName: string;
-  sourceSlug?: string;
-  sourceBaseUrl?: string;
-  title: string;
-  summary?: string;
-  url?: string;
-  publishedAt?: string; // ISO date
-  rawPayload?: unknown;
-};
-
-function slugify(name: string): string {
-  return name
-    .toLowerCase()
-    .replace(/\s+/g, "-")
-    .replace(/[^a-z0-9-]/g, "");
-}
+export type { IngestArticle };
 
 export async function POST(request: NextRequest) {
+  const ingestKey = process.env.INGEST_API_KEY;
+  if (ingestKey) {
+    const key = request.headers.get("x-api-key") ?? request.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
+    if (key !== ingestKey) {
+      return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
+    }
+  }
+
   try {
     const body = await request.json();
     const { articles: raw } = body as { articles?: IngestArticle[] };
@@ -38,60 +29,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    let created = 0;
-    let skipped = 0;
-
-    for (const a of raw) {
-      if (!a.title || !a.sourceName) {
-        skipped++;
-        continue;
-      }
-
-      const slug = a.sourceSlug ?? slugify(a.sourceName);
-
-      const source = await prisma.source.upsert({
-        where: { slug },
-        create: {
-          name: a.sourceName,
-          slug,
-          baseUrl: a.sourceBaseUrl ?? null,
-        },
-        update: {},
-      });
-
-      const publishedAt = a.publishedAt ? new Date(a.publishedAt) : null;
-
-      const existing = a.externalId
-        ? await prisma.article.findFirst({
-            where: { sourceId: source.id, externalId: a.externalId },
-          })
-        : null;
-
-      if (existing) {
-        skipped++;
-        continue;
-      }
-
-      await prisma.article.create({
-        data: {
-          sourceId: source.id,
-          externalId: a.externalId ?? null,
-          title: a.title,
-          summary: a.summary ?? null,
-          url: a.url ?? null,
-          publishedAt,
-          rawPayload: a.rawPayload ? (a.rawPayload as object) : null,
-        },
-      });
-      created++;
-    }
-
-    return NextResponse.json({
-      ok: true,
-      created,
-      skipped,
-      total: raw.length,
-    });
+    const result = await ingestArticles(raw);
+    return NextResponse.json({ ok: true, ...result });
   } catch (e) {
     console.error("[ingest]", e);
     return NextResponse.json(
