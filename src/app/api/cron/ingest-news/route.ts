@@ -25,5 +25,5 @@ export async function GET(request: NextRequest) {
       { status: result.error.includes("NEWS_API_KEY") ? 503 : 500 }
     );
   }
-  return NextResponse.json({ ok: true, ...result });
+  return NextResponse.json(result);
 }
