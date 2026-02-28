@@ -7,14 +7,15 @@ import { NextResponse } from "next/server";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const url = process.env.DATABASE_URL;
+  const url = process.env.POSTGRES_PRISMA_URL ?? process.env.DATABASE_URL;
   if (!url) {
     return NextResponse.json({
       ok: false,
-      message: "DATABASE_URL is not set in this environment.",
-      hint: "Add DATABASE_URL in Vercel → Project → Settings → Environment Variables for Production.",
+      message: "POSTGRES_PRISMA_URL (or DATABASE_URL) is not set.",
+      hint: "Connect Supabase in Vercel (Settings → Integrations) or add POSTGRES_PRISMA_URL in Environment Variables.",
     });
   }
+  const source = process.env.POSTGRES_PRISMA_URL ? "POSTGRES_PRISMA_URL" : "DATABASE_URL";
   const isPooler = url.includes("pooler.supabase.com");
   const isDirect = url.includes("db.") && url.includes("supabase.co");
   let region: string | null = null;
@@ -24,6 +25,7 @@ export async function GET() {
   return NextResponse.json({
     ok: true,
     hasUrl: true,
+    envVar: source,
     usingPooler: isPooler,
     usingDirect: isDirect,
     region: region ?? (isPooler ? "could not parse" : null),

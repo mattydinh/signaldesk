@@ -16,7 +16,7 @@ AI-powered financial & political intelligence platform. Ingests news from APIs, 
    ```
 
 2. **Database**  
-   Create PostgreSQL (e.g. [Supabase](https://supabase.com)). Copy `.env.example` to `.env` and set `DATABASE_URL`.
+   Create PostgreSQL (e.g. [Supabase](https://supabase.com)). Copy `.env.example` to `.env` and set **POSTGRES_PRISMA_URL** to your pooler URI (Supabase → Project Settings → Database → Connection string → URI, Session pooler, port 6543).
 
 3. **Schema**
    ```bash
@@ -60,13 +60,13 @@ AI-powered financial & political intelligence platform. Ingests news from APIs, 
 
 1. Push repo to GitHub and import in [Vercel](https://vercel.com).
 2. **Database (required for /api/articles and dashboard):**
-   - In **Vercel → Project → Settings → Environment Variables**, add **DATABASE_URL** for **Production** (and Preview if you use it).
-   - **Supabase:** use the **Connection pooler** URI (Session or Transaction mode), not the direct connection. In Supabase: **Project Settings → Database → Connection string → URI**; choose the one with port **6543** (e.g. `postgresql://postgres.[ref]:[PASSWORD]@aws-0-[region].pooler.supabase.com:6543/postgres?sslmode=require`). Serverless on Vercel often can’t reach the direct `db.*.supabase.co:5432` URL.
-   - If you see “Can’t reach database server”, also check that your Supabase project isn’t **paused** (free tier pauses after inactivity; restore it in the Supabase dashboard).
+   - **Recommended:** Install the [Supabase integration](https://vercel.com/integrations/supabase) for this Vercel project and connect your Supabase project. It sets **POSTGRES_PRISMA_URL** (and related vars) automatically; redeploy after connecting.
+   - **Or manually:** In **Vercel → Settings → Environment Variables**, add **POSTGRES_PRISMA_URL** with your Supabase **pooler** URI (port 6543, from Supabase → Project Settings → Database → Connection string → URI). Do not use the direct connection (port 5432); serverless often can’t reach it.
+   - If your Supabase project is **paused** (free tier), restore it in the Supabase dashboard.
 3. Add other env vars as needed: **NEWS_API_KEY**, **CRON_SECRET**, **OPENAI_API_KEY**, **INGEST_API_KEY**, **DASHBOARD_PASSWORD**.
 4. Deploy. Cron runs daily and calls **/api/cron/ingest-news** (set **CRON_SECRET** if you protect the endpoint).
 
 ### Troubleshooting DB on Vercel
 
-- **Find your Supabase region:** In [Supabase Dashboard](https://supabase.com/dashboard) → your project → **Project Settings** (gear) → **General**. The **Region** field shows e.g. "East US (North Virginia)" → use `us-east-1` in the pooler host: `aws-0-us-east-1.pooler.supabase.com`.
-- **See what the app is using:** After deploying, open **https://your-app.vercel.app/api/debug-db**. It reports whether `DATABASE_URL` is set and if it’s the pooler or direct URL (no secrets). If it says `usingDirect: true`, the env in Vercel is still the direct URL — replace it with the pooler URI and redeploy.
+- **See what the app is using:** Open **https://your-app.vercel.app/api/debug-db**. It reports which env var is set (POSTGRES_PRISMA_URL or DATABASE_URL), pooler vs direct, and region. Use the Supabase integration so **POSTGRES_PRISMA_URL** is set automatically, then redeploy.
+- **Region:** Supabase Dashboard → Project Settings → General shows **Region** (e.g. East US → `us-east-1`). The pooler host must match: `aws-0-<region>.pooler.supabase.com`.
