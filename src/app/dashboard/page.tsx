@@ -231,7 +231,7 @@ async function ArticlesList({
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; sourceId?: string }>;
+  searchParams: Promise<{ q?: string; sourceId?: string; category?: string }>;
 }) {
   const params = await searchParams;
   const q = params.q ?? null;
