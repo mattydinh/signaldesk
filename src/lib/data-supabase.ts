@@ -6,6 +6,7 @@ import { getSupabaseAdmin } from "./supabase-server";
 import { getFeedCache, setFeedCache, type CachedArticle } from "./feed-cache";
 import { hasBlobFeed, readFeedFromBlob, writeFeedToBlob } from "./feed-blob";
 import { hasKvFeed, readFeedFromKv, writeFeedToKv } from "./feed-kv";
+import { inferCategoriesFromText } from "./categories";
 
 const SOURCE_TABLE = process.env.SUPABASE_SOURCE_TABLE ?? "Source";
 const ARTICLE_TABLE = process.env.SUPABASE_ARTICLE_TABLE ?? "Article";
@@ -74,12 +75,17 @@ export async function getArticlesSupabase(options: {
         const analysisMap = await getAnalysisBatchSupabase(realIds);
         const merged = articles.map((a) => {
           const analysis = analysisMap.get(a.id);
-          if (!analysis) return a;
-          return { ...a, ...analysis };
+          const out = analysis ? { ...a, ...analysis } : a;
+          const categories = out.categories?.length ? out.categories : inferCategoriesFromText(out.title ?? null, out.summary ?? null);
+          return { ...out, categories };
         });
         return { articles: merged, total };
       }
-      return { articles, total };
+      const withInferred = articles.map((a) => ({
+        ...a,
+        categories: a.categories?.length ? a.categories : inferCategoriesFromText(a.title ?? null, a.summary ?? null),
+      }));
+      return { articles: withInferred, total };
     }
   }
   if (hasKvFeed()) {
@@ -102,12 +108,17 @@ export async function getArticlesSupabase(options: {
         const analysisMap = await getAnalysisBatchSupabase(realIds);
         const merged = articles.map((a) => {
           const analysis = analysisMap.get(a.id);
-          if (!analysis) return a;
-          return { ...a, ...analysis };
+          const out = analysis ? { ...a, ...analysis } : a;
+          const categories = out.categories?.length ? out.categories : inferCategoriesFromText(out.title ?? null, out.summary ?? null);
+          return { ...out, categories };
         });
         return { articles: merged, total };
       }
-      return { articles, total };
+      const withInferred = articles.map((a) => ({
+        ...a,
+        categories: a.categories?.length ? a.categories : inferCategoriesFromText(a.title ?? null, a.summary ?? null),
+      }));
+      return { articles: withInferred, total };
     }
   }
 
@@ -155,10 +166,18 @@ export async function getArticlesSupabase(options: {
   if (articles.length <= 1) {
     const cached = getFeedCache();
     if (cached.length > articles.length) {
-      return { articles: cached, total: cached.length };
+      const withInferred = cached.map((a) => ({
+        ...a,
+        categories: a.categories?.length ? a.categories : inferCategoriesFromText(a.title ?? null, a.summary ?? null),
+      }));
+      return { articles: withInferred, total: cached.length };
     }
   }
-  return { articles, total };
+  const withInferred = articles.map((a) => ({
+    ...a,
+    categories: a.categories?.length ? a.categories : inferCategoriesFromText(a.title ?? null, a.summary ?? null),
+  }));
+  return { articles: withInferred, total };
 }
 
 export type IngestArticleInput = {
