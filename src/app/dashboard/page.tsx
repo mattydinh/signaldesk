@@ -198,9 +198,6 @@ export default async function DashboardPage({
             SignalDesk
           </Link>
           <div className="flex items-center gap-4">
-            <Link href="/contact" className="text-sm text-muted-foreground hover:text-foreground">
-              Contact
-            </Link>
             {process.env.DASHBOARD_PASSWORD ? (
               <form action="/api/auth/logout" method="POST" className="inline">
                 <button type="submit" className="text-sm text-muted-foreground hover:text-foreground">
