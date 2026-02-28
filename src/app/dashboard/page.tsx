@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import Link from "next/link";
 import DashboardFilters from "./DashboardFilters";
 import AnalyzeButton from "./AnalyzeButton";
+import FetchNewsButton from "./FetchNewsButton";
 
 export const dynamic = "force-dynamic";
 
@@ -61,7 +62,7 @@ async function ArticlesList({
       <p className="text-muted-foreground text-sm">
         {q || sourceId
           ? "No articles match the filters."
-          : "No articles yet. Use POST /api/news/ingest to add some."}
+          : "No articles yet. Click “Fetch news now” above to load headlines from News API (requires NEWS_API_KEY in Vercel)."}
       </p>
     );
   }
@@ -216,7 +217,10 @@ export default async function DashboardPage({
         <p className="mt-1 text-sm text-muted-foreground">
           Opportunities and implications for shareholders, investors, and business leaders.
         </p>
-        <DashboardFilters sources={sources} />
+        <div className="mt-4 flex flex-wrap items-center gap-4">
+          <DashboardFilters sources={sources} />
+          <FetchNewsButton />
+        </div>
         <Suspense
           fallback={
             <p className="mt-6 text-muted-foreground">Loading articles…</p>
