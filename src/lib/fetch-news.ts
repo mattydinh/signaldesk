@@ -18,15 +18,16 @@ export async function fetchAndIngestNews(): Promise<FetchNewsResult> {
   const allArticles: IngestArticle[] = [];
   const seen = new Set<string>();
 
-  for (const category of categories) {
-    const url = `https://newsapi.org/v2/top-headlines?country=us&category=${category}&pageSize=20&apiKey=${newsApiKey}`;
-    const res = await fetch(url, { cache: "no-store" });
-    if (!res.ok) {
-      const err = await res.text();
-      console.error("[fetch-news] News API error", res.status, err);
-      continue;
-    }
-    const data = (await res.json()) as {
+  try {
+    for (const category of categories) {
+      const url = `https://newsapi.org/v2/top-headlines?country=us&category=${category}&pageSize=20&apiKey=${newsApiKey}`;
+      const res = await fetch(url, { cache: "no-store" });
+      if (!res.ok) {
+        const err = await res.text();
+        console.error("[fetch-news] News API error", res.status, err);
+        continue;
+      }
+      const data = (await res.json()) as {
       status: string;
       articles?: Array<{
         source?: { id?: string; name?: string };
@@ -54,12 +55,22 @@ export async function fetchAndIngestNews(): Promise<FetchNewsResult> {
         rawPayload: a,
       });
     }
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "Failed to fetch from News API.";
+    console.error("[fetch-news] fetch error", e);
+    return { ok: false, error: message };
   }
 
   if (allArticles.length === 0) {
     return { ok: true, created: 0, skipped: 0, total: 0 };
   }
 
-  const result = await ingestArticles(allArticles);
-  return { ok: true, ...result };
+  try {
+    const result = await ingestArticles(allArticles);
+    return { ok: true, ...result };
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "Database ingest failed.";
+    console.error("[fetch-news] ingest error", e);
+    return { ok: false, error: message };
+  }
 }

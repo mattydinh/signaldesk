@@ -6,7 +6,15 @@ import { fetchAndIngestNews } from "@/lib/fetch-news";
 export type FetchNewsResult = Awaited<ReturnType<typeof fetchAndIngestNews>>;
 
 export async function fetchNewsNow(): Promise<FetchNewsResult> {
-  const result = await fetchAndIngestNews();
-  revalidatePath("/dashboard");
-  return result;
+  try {
+    const result = await fetchAndIngestNews();
+    if (result.ok) {
+      revalidatePath("/dashboard");
+    }
+    return result;
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "Fetch news failed.";
+    console.error("[fetchNewsNow]", e);
+    return { ok: false, error: message };
+  }
 }

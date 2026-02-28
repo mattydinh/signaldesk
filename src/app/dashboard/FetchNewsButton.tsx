@@ -23,9 +23,10 @@ export default function FetchNewsButton() {
         setStatus("error");
         setMessage(result.error);
       }
-    } catch (e) {
+    } catch (e: unknown) {
       setStatus("error");
-      setMessage(e instanceof Error ? e.message : "Something went wrong.");
+      const err = e as { message?: string; digest?: string };
+      setMessage(err?.message || err?.digest || "Something went wrong. Check Vercel logs for details.");
     }
   }
 
