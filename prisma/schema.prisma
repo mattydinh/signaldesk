@@ -1,0 +1,47 @@
+// SignalDesk - Financial & Political Intelligence
+// PostgreSQL (Supabase)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Source {
+  id        String   @id @default(cuid())
+  name      String   // e.g. "Reuters", "Politico"
+  slug      String   @unique
+  baseUrl   String?
+  createdAt DateTime @default(now())
+  articles  Article[]
+}
+
+model Article {
+  id            String    @id @default(cuid())
+  externalId    String?   // id from upstream API
+  sourceId      String
+  source        Source    @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  title         String
+  summary       String?   @db.Text
+  url           String?
+  publishedAt   DateTime?
+  rawPayload    Json?     // original API response for debugging
+  // NLP / intelligence (populated by analyze)
+  entities      String[]  @default([]) // extracted entities
+  topics        String[]  @default([]) // extracted topics
+  implications  String?   @db.Text     // short summary (legacy)
+  opportunities String[]  @default([]) // concrete opportunities / recommendations
+  forShareholders String?  @db.Text    // what this means for shareholders
+  forInvestors   String?   @db.Text    // what this means for investors / markets
+  forBusiness    String?   @db.Text    // what this means for business leaders
+  // embedding  vector(1536) — add with pgvector extension when ready
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([sourceId])
+  @@index([publishedAt(sort: Desc)])
+  @@index([createdAt(sort: Desc)])
+}
