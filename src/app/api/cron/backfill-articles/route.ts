@@ -1,3 +1,4 @@
+import { randomUUID } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { hasSupabaseDb, getSupabaseAdmin } from "@/lib/supabase-server";
 import { hasBlobFeed, readFeedFromBlob } from "@/lib/feed-blob";
@@ -58,16 +59,17 @@ export async function GET(request: NextRequest) {
     if ((existingSource as { id?: string })?.id) {
       sourceId = (existingSource as { id: string }).id;
     } else {
+      const newSourceId = randomUUID();
       const { data: newSource, error: sourceErr } = await sb
         .from(SOURCE_TABLE)
-        .insert({ name: a.sourceName, slug })
+        .insert({ id: newSourceId, name: a.sourceName, slug })
         .select("id")
         .single();
-      if (sourceErr || !(newSource as { id?: string })?.id) {
-        errors.push(`Source ${a.sourceName}: ${(sourceErr as Error)?.message ?? "no id"}`);
+      if (sourceErr) {
+        errors.push(`Source ${a.sourceName}: ${(sourceErr as Error)?.message ?? String(sourceErr)}`);
         continue;
       }
-      sourceId = (newSource as { id: string }).id;
+      sourceId = (newSource as { id: string })?.id ?? newSourceId;
     }
 
     const publishedAt = a.publishedAt ? new Date(a.publishedAt).toISOString() : null;
