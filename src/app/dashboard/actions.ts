@@ -5,13 +5,17 @@ import { fetchAndIngestNews } from "@/lib/fetch-news";
 
 export type FetchNewsResult = Awaited<ReturnType<typeof fetchAndIngestNews>>;
 
-export async function fetchNewsNow(): Promise<FetchNewsResult> {
+function hasAnalyzeProvider(): boolean {
+  return !!(process.env.GROQ_API_KEY || process.env.OPENAI_API_KEY);
+}
+
+export async function fetchNewsNow(): Promise<FetchNewsResult & { hasAnalyzeProvider?: boolean }> {
   try {
     const result = await fetchAndIngestNews();
     if (result.ok) {
       revalidatePath("/dashboard");
     }
-    return result;
+    return { ...result, hasAnalyzeProvider: hasAnalyzeProvider() };
   } catch (e) {
     const message = e instanceof Error ? e.message : "Fetch news failed.";
     console.error("[fetchNewsNow]", e);

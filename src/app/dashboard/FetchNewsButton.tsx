@@ -23,7 +23,8 @@ export default function FetchNewsButton() {
         return;
       }
       const ids = result.newArticleIds ?? [];
-      if (ids.length > 0) {
+      const shouldAnalyze = (result as { hasAnalyzeProvider?: boolean }).hasAnalyzeProvider && ids.length > 0;
+      if (shouldAnalyze) {
         setStatus("analyzing");
         setMessage(`Analyzing ${ids.length} new article${ids.length !== 1 ? "s" : ""}…`);
         for (let i = 0; i < ids.length; i += ANALYZE_CONCURRENCY) {
@@ -43,7 +44,7 @@ export default function FetchNewsButton() {
       setMessage(
         result.total === 0
           ? "No new articles from News API."
-          : `Loaded ${result.created} new article${result.created !== 1 ? "s" : ""} (${result.skipped} already existed).${ids.length > 0 ? " Analysis complete." : ""}`
+          : `Loaded ${result.created} new article${result.created !== 1 ? "s" : ""} (${result.skipped} already existed).${shouldAnalyze ? " Analysis complete." : ""}`
       );
     } catch (e: unknown) {
       setStatus("error");
@@ -58,7 +59,7 @@ export default function FetchNewsButton() {
         type="button"
         onClick={handleClick}
         disabled={status === "loading" || status === "analyzing"}
-        className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+        className="rounded-lg gradient-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-md shadow-primary/20 hover:opacity-95 disabled:opacity-50 transition-opacity"
       >
         {status === "loading" ? "Fetching…" : status === "analyzing" ? "Analyzing…" : "Fetch news now"}
       </button>

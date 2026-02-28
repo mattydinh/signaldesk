@@ -34,7 +34,7 @@ export default function AnalyzeButton({ articleId }: { articleId: string }) {
         type="button"
         onClick={handleAnalyze}
         disabled={loading}
-        className="shrink-0 rounded border border-primary/50 bg-primary/10 px-2 py-1 text-xs font-medium text-primary hover:bg-primary/20 disabled:opacity-50"
+        className="shrink-0 rounded-lg border-2 border-primary/40 bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/20 disabled:opacity-50 transition-colors"
       >
         {loading ? "Analyzing…" : "Analyze"}
       </button>

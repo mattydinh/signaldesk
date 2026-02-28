@@ -19,7 +19,7 @@ export default function DashboardFilters({ sources }: { sources: Source[] }) {
   }, [q, sourceId, router]);
 
   return (
-    <div className="mt-6 flex flex-wrap items-end gap-3">
+    <div className="flex flex-wrap items-end gap-3">
       <div className="min-w-[200px] flex-1">
         <label htmlFor="search" className="block text-xs font-medium text-muted-foreground">
           Search
@@ -31,7 +31,7 @@ export default function DashboardFilters({ sources }: { sources: Source[] }) {
           value={q}
           onChange={(e) => setQ(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && apply()}
-          className="mt-1 block w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+          className="mt-1 block w-full rounded-lg border border-input bg-card px-3 py-2 text-sm placeholder:text-muted-foreground/70 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50 transition-shadow"
         />
       </div>
       <div className="min-w-[160px]">
@@ -42,7 +42,7 @@ export default function DashboardFilters({ sources }: { sources: Source[] }) {
           id="source"
           value={sourceId}
           onChange={(e) => setSourceId(e.target.value)}
-          className="mt-1 block w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+          className="mt-1 block w-full rounded-lg border border-input bg-card px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50 transition-shadow"
         >
           <option value="">All sources</option>
           {sources.map((s) => (
@@ -55,7 +55,7 @@ export default function DashboardFilters({ sources }: { sources: Source[] }) {
       <button
         type="button"
         onClick={apply}
-        className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+        className="rounded-lg gradient-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-md shadow-primary/20 hover:opacity-95 transition-opacity"
       >
         Apply
       </button>

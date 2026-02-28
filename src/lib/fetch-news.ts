@@ -11,7 +11,11 @@ export type FetchNewsResult =
 export async function fetchAndIngestNews(): Promise<FetchNewsResult> {
   const newsApiKey = process.env.NEWS_API_KEY;
   if (!newsApiKey) {
-    return { ok: false, error: "NEWS_API_KEY is not set. Add it in Vercel → Settings → Environment Variables (get a key at newsapi.org)." };
+    return {
+      ok: false,
+      error:
+        "NEWS_API_KEY is not set. For local dev add it to .env; for production add it in Vercel → Settings → Environment Variables (get a key at newsapi.org).",
+    };
   }
 
   const categories = ["business", "general"] as const;
