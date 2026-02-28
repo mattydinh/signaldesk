@@ -2,7 +2,6 @@ import { Suspense } from "react";
 import Link from "next/link";
 import DashboardFilters from "./DashboardFilters";
 import AnalyzeButton from "./AnalyzeButton";
-import FetchNewsButton from "./FetchNewsButton";
 import { hasSupabaseDb } from "@/lib/supabase-server";
 import { getArticlesSupabase, getSourcesSupabase } from "@/lib/data-supabase";
 
@@ -12,16 +11,6 @@ const base =
   process.env.VERCEL_URL != null
     ? `https://${process.env.VERCEL_URL}`
     : process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
-
-async function getSources() {
-  if (hasSupabaseDb()) {
-    return getSourcesSupabase();
-  }
-  const res = await fetch(`${base}/api/sources`, { cache: "no-store" });
-  if (!res.ok) return [];
-  const data = (await res.json()) as { sources: Array<{ id: string; name: string }> };
-  return data.sources;
-}
 
 type ArticleForList = {
   id: string;
@@ -42,14 +31,12 @@ type ArticleForList = {
 
 async function getArticlesForList(
   q: string | null,
-  sourceId: string | null,
   category: string | null
 ): Promise<{ articles: ArticleForList[]; total: number }> {
   if (hasSupabaseDb()) {
     const { articles, total } = await getArticlesSupabase({
       limit: 50,
       offset: 0,
-      sourceId: sourceId ?? undefined,
       category: category ?? undefined,
       q: q ?? undefined,
     });
@@ -65,7 +52,7 @@ async function getArticlesForList(
   }
   const params = new URLSearchParams({ limit: "20" });
   if (q) params.set("q", q);
-  if (sourceId) params.set("sourceId", sourceId);
+  if (category) params.set("category", category);
   const res = await fetch(`${base}/api/articles?${params}`, { cache: "no-store" });
   if (!res.ok) throw new Error("Could not load articles");
   const data = (await res.json()) as { articles: ArticleForList[]; pagination: { total: number } };
@@ -74,19 +61,17 @@ async function getArticlesForList(
 
 async function ArticlesList({
   q,
-  sourceId,
   category,
   hasAnalyzeProvider,
 }: {
   q: string | null;
-  sourceId: string | null;
   category: string | null;
   hasAnalyzeProvider: boolean;
 }) {
   let articles: ArticleForList[];
   let total: number;
   try {
-    const data = await getArticlesForList(q, sourceId, category);
+    const data = await getArticlesForList(q, category);
     articles = data.articles;
     total = data.total;
   } catch {
@@ -100,7 +85,7 @@ async function ArticlesList({
   if (articles.length === 0) {
     return (
       <p className="text-muted-foreground text-sm">
-        {q || sourceId || category
+        {q || category
           ? "No articles match the filters."
           : "No articles yet. Click “Fetch news now” above to load headlines (add NEWS_API_KEY to .env locally or in Vercel)."}
       </p>
@@ -231,14 +216,11 @@ async function ArticlesList({
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; sourceId?: string; category?: string }>;
+  searchParams: Promise<{ q?: string; category?: string }>;
 }) {
   const params = await searchParams;
   const q = params.q ?? null;
-  const sourceId = params.sourceId ?? null;
   const category = params.category ?? null;
-
-  const sources = await getSources();
 
   return (
     <div className="min-h-screen gradient-mesh">
@@ -271,8 +253,7 @@ export default async function DashboardPage({
           </p>
         </div>
         <div className="flex flex-wrap items-end gap-3">
-          <DashboardFilters sources={sources} />
-          <FetchNewsButton />
+          <DashboardFilters />
         </div>
         <Suspense
           fallback={
@@ -282,7 +263,6 @@ export default async function DashboardPage({
           <div className="mt-6">
             <ArticlesList
               q={q}
-              sourceId={sourceId}
               category={category}
               hasAnalyzeProvider={!!(process.env.GROQ_API_KEY || process.env.OPENAI_API_KEY)}
             />
