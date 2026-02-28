@@ -242,7 +242,7 @@ export default async function DashboardPage({
           </p>
         </div>
         <p className="mb-4 text-sm text-muted-foreground">
-          This feed scrapes and updates regularly. We keep adding new articles so you stay on top of what matters.
+          This feed continuously aggregates and analyzes relevant finance and political news, updating in real time. New articles are added regularly to ensure you stay informed on the developments that matter most.
         </p>
         <div className="flex flex-wrap items-end gap-3">
           <DashboardFilters />
