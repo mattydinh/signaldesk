@@ -16,7 +16,9 @@ export async function GET() {
     });
   }
   const source = process.env.POSTGRES_PRISMA_URL ? "POSTGRES_PRISMA_URL" : "DATABASE_URL";
-  const usingSupabaseApi = !!(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
+  const hasSupabaseUrl = !!(process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL);
+  const hasServiceRoleKey = !!process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const usingSupabaseApi = hasSupabaseUrl && hasServiceRoleKey;
   const isPooler = url.includes("pooler.supabase.com");
   const isDirect = url.includes("db.") && url.includes("supabase.co");
   let region: string | null = null;
@@ -28,13 +30,18 @@ export async function GET() {
     hasUrl: true,
     envVar: source,
     usingSupabaseApi,
+    supabaseEnv: { hasSupabaseUrl, hasServiceRoleKey },
     usingPooler: isPooler,
     usingDirect: isDirect,
     region: region ?? (isPooler ? "could not parse" : null),
-    hint: isDirect
-      ? "You are still using the DIRECT connection (db.*.supabase.co). Use the POOLER URL (port 6543, host *.pooler.supabase.com) in Vercel env vars and redeploy."
-      : isPooler
-        ? "Using pooler. If connection still fails, try a different region (e.g. us-west-1, eu-west-1)."
-        : "Unknown URL format.",
+    hint: !usingSupabaseApi && hasSupabaseUrl
+      ? "Supabase REST API is OFF: SUPABASE_SERVICE_ROLE_KEY is not set. Add it in Vercel (Supabase Dashboard → Settings → API → service_role secret) and redeploy."
+      : !usingSupabaseApi && hasServiceRoleKey
+        ? "Supabase REST API is OFF: Supabase URL not set. Add SUPABASE_URL or NEXT_PUBLIC_SUPABASE_URL in Vercel and redeploy."
+        : isDirect
+          ? "You are still using the DIRECT connection (db.*.supabase.co). Use the POOLER URL (port 6543) or enable Supabase REST (see supabaseEnv)."
+          : isPooler
+            ? "Using pooler. If connection still fails, enable Supabase REST (SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY) or try a different region."
+            : "Unknown URL format.",
   });
 }

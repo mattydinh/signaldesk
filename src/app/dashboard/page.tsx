@@ -3,6 +3,8 @@ import Link from "next/link";
 import DashboardFilters from "./DashboardFilters";
 import AnalyzeButton from "./AnalyzeButton";
 import FetchNewsButton from "./FetchNewsButton";
+import { hasSupabaseDb } from "@/lib/supabase-server";
+import { getArticlesSupabase, getSourcesSupabase } from "@/lib/data-supabase";
 
 export const dynamic = "force-dynamic";
 
@@ -12,10 +14,54 @@ const base =
     : process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
 
 async function getSources() {
+  if (hasSupabaseDb()) {
+    return getSourcesSupabase();
+  }
   const res = await fetch(`${base}/api/sources`, { cache: "no-store" });
   if (!res.ok) return [];
   const data = (await res.json()) as { sources: Array<{ id: string; name: string }> };
   return data.sources;
+}
+
+type ArticleForList = {
+  id: string;
+  title: string;
+  summary: string | null;
+  url: string | null;
+  publishedAt: string | null;
+  implications: string | null;
+  entities: string[];
+  topics: string[];
+  opportunities: string[];
+  forShareholders: string | null;
+  forInvestors: string | null;
+  forBusiness: string | null;
+  source: { name: string };
+};
+
+async function getArticlesForList(q: string | null, sourceId: string | null): Promise<{ articles: ArticleForList[]; total: number }> {
+  if (hasSupabaseDb()) {
+    const { articles, total } = await getArticlesSupabase({
+      limit: 20,
+      offset: 0,
+      sourceId: sourceId ?? undefined,
+      q: q ?? undefined,
+    });
+    const sources = await getSourcesSupabase();
+    const sourceMap = new Map(sources.map((s) => [s.id, s.name]));
+    const articlesWithSource: ArticleForList[] = articles.map((a) => ({
+      ...a,
+      source: { name: sourceMap.get(a.sourceId) ?? "Unknown" },
+    }));
+    return { articles: articlesWithSource, total };
+  }
+  const params = new URLSearchParams({ limit: "20" });
+  if (q) params.set("q", q);
+  if (sourceId) params.set("sourceId", sourceId);
+  const res = await fetch(`${base}/api/articles?${params}`, { cache: "no-store" });
+  if (!res.ok) throw new Error("Could not load articles");
+  const data = (await res.json()) as { articles: ArticleForList[]; pagination: { total: number } };
+  return { articles: data.articles, total: data.pagination.total };
 }
 
 async function ArticlesList({
@@ -25,39 +71,21 @@ async function ArticlesList({
   q: string | null;
   sourceId: string | null;
 }) {
-  const params = new URLSearchParams({ limit: "20" });
-  if (q) params.set("q", q);
-  if (sourceId) params.set("sourceId", sourceId);
-  const res = await fetch(`${base}/api/articles?${params}`, {
-    cache: "no-store",
-  });
-  if (!res.ok) {
+  let articles: ArticleForList[];
+  let total: number;
+  try {
+    const data = await getArticlesForList(q, sourceId);
+    articles = data.articles;
+    total = data.total;
+  } catch {
     return (
       <p className="text-muted-foreground text-sm">
         Could not load articles. Is the database connected?
       </p>
     );
   }
-  const data = (await res.json()) as {
-    articles: Array<{
-      id: string;
-      title: string;
-      summary: string | null;
-      url: string | null;
-      publishedAt: string | null;
-      implications: string | null;
-      entities: string[];
-      topics: string[];
-      opportunities: string[];
-      forShareholders: string | null;
-      forInvestors: string | null;
-      forBusiness: string | null;
-      source: { name: string };
-    }>;
-    pagination: { total: number; pages: number };
-  };
 
-  if (data.articles.length === 0) {
+  if (articles.length === 0) {
     return (
       <p className="text-muted-foreground text-sm">
         {q || sourceId
@@ -70,10 +98,10 @@ async function ArticlesList({
   return (
     <>
       <p className="text-muted-foreground text-sm">
-        {data.pagination.total} article{data.pagination.total !== 1 ? "s" : ""}
+        {total} article{total !== 1 ? "s" : ""}
       </p>
       <ul className="mt-4 space-y-4">
-        {data.articles.map((a) => (
+        {articles.map((a) => (
           <li
             key={a.id}
             className="rounded-lg border border-border bg-card p-4 shadow-sm"
