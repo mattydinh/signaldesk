@@ -3,10 +3,15 @@ import { prisma } from "@/lib/db";
 import { hasSupabaseDb } from "@/lib/supabase-server";
 import { getArticleByIdSupabase, updateArticleAnalysisSupabase } from "@/lib/data-supabase";
 
+import { ARTICLE_CATEGORIES } from "@/lib/categories";
+
+const CATEGORY_LIST = ARTICLE_CATEGORIES.join(", ");
+
 const SYSTEM_PROMPT = `You are an analyst for a financial and political intelligence platform. Given news article text, respond with a JSON object only (no markdown, no code block) with exactly these keys:
 
 - "entities": array of 3-8 notable entities (people, companies, countries, agencies) mentioned.
 - "topics": array of 2-5 topics or themes (e.g. "monetary policy", "elections", "energy", "tax policy").
+- "categories": array of 1-3 categories from this exact list (use these strings only): ${CATEGORY_LIST}. Pick the most relevant; use "Other" only if none fit. Examples: finance + elections → ["Finance", "Political"]; bitcoin regulation → ["Crypto", "Regulation"]; military conflict → ["War & Conflict", "Geopolitics"].
 - "implications": one to two sentences: a clear AI-generated summary of what the article is about and why it matters for decision-makers. If the piece is about policy, law, or regulation, briefly state what is changing and who it affects.
 - "opportunities": array of 2-5 concrete opportunities or recommendations (e.g. "Consider overweight sectors benefiting from rate cuts", "Watch for policy clarity in Q2"). Be specific and actionable.
 - "forShareholders": 1-3 sentences on what this news means for equity holders: valuation, dividends, sector rotation, company-specific risks. For political or regulatory news, call out how a law or policy change could affect specific industries or sectors (e.g. "A tariff on X could pressure margins in industry Y").
@@ -135,6 +140,7 @@ export async function POST(
     const parsed = JSON.parse(raw) as {
       entities?: string[];
       topics?: string[];
+      categories?: string[];
       implications?: string;
       opportunities?: string[];
       forShareholders?: string;
@@ -144,6 +150,8 @@ export async function POST(
 
     const entities = Array.isArray(parsed.entities) ? parsed.entities : [];
     const topics = Array.isArray(parsed.topics) ? parsed.topics : [];
+    const rawCategories = Array.isArray(parsed.categories) ? parsed.categories : [];
+    const categories = rawCategories.filter((c) => typeof c === "string" && ARTICLE_CATEGORIES.includes(c as (typeof ARTICLE_CATEGORIES)[number]));
     const implications = typeof parsed.implications === "string" ? parsed.implications.trim() : null;
     const opportunities = Array.isArray(parsed.opportunities) ? parsed.opportunities : [];
     const forShareholders = typeof parsed.forShareholders === "string" ? parsed.forShareholders.trim() : null;
@@ -154,6 +162,7 @@ export async function POST(
       await updateArticleAnalysisSupabase(id, {
         entities,
         topics,
+        categories,
         opportunities,
         implications,
         forShareholders,
@@ -166,6 +175,7 @@ export async function POST(
         data: {
           entities,
           topics,
+          categories,
           implications,
           opportunities,
           forShareholders,
@@ -180,6 +190,7 @@ export async function POST(
       id,
       entities,
       topics,
+      categories,
       implications,
       opportunities,
       forShareholders,

@@ -1,8 +1,10 @@
 # SignalDesk
 
-AI-powered financial & political intelligence. Ingests news from News API, stores in Supabase, and generates summaries and implications for shareholders, investors, and business leaders (Groq or OpenAI). Feed list is served from Vercel Blob when configured.
+**Financial & political intelligence, simplified.** SignalDesk turns the day’s news into clear, actionable intelligence for shareholders, investors, and business leaders. Your feed refreshes daily (or on demand), and AI summarizes each story and spells out what it means for you—so you see the signal, not just the noise.
 
 **Live:** [signaldesk-chi.vercel.app](https://signaldesk-chi.vercel.app)
+
+*Product copy and taglines for non-technical users: [docs/PRODUCT_COPY.md](docs/PRODUCT_COPY.md)*
 
 ## Tech stack
 

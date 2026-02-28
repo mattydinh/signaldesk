@@ -32,6 +32,7 @@ model Article {
   // NLP / intelligence (populated by analyze)
   entities      String[]  @default([]) // extracted entities
   topics        String[]  @default([]) // extracted topics
+  categories    String[]  @default([]) // e.g. Finance, Crypto, Political, Geopolitics, War & Conflict, Technology, Regulation, Markets, Energy
   implications  String?   @db.Text     // short summary (legacy)
   opportunities String[]  @default([]) // concrete opportunities / recommendations
   forShareholders String?  @db.Text    // what this means for shareholders

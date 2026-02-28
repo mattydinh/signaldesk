@@ -16,6 +16,7 @@ export async function GET(request: NextRequest) {
     const page = Math.max(1, parseInt(searchParams.get("page") ?? "1", 10));
     const limit = Math.min(50, Math.max(1, parseInt(searchParams.get("limit") ?? "20", 10)));
     const sourceId = searchParams.get("sourceId") ?? undefined;
+    const category = searchParams.get("category") ?? undefined;
     const q = searchParams.get("q")?.trim() ?? undefined;
     const offset = (page - 1) * limit;
 
@@ -24,6 +25,7 @@ export async function GET(request: NextRequest) {
         limit,
         offset,
         sourceId,
+        category,
         q,
       });
       const sources = await getSourcesSupabase();

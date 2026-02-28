@@ -32,6 +32,7 @@ type ArticleForList = {
   implications: string | null;
   entities: string[];
   topics: string[];
+  categories: string[];
   opportunities: string[];
   forShareholders: string | null;
   forInvestors: string | null;
@@ -39,12 +40,17 @@ type ArticleForList = {
   source: { name: string };
 };
 
-async function getArticlesForList(q: string | null, sourceId: string | null): Promise<{ articles: ArticleForList[]; total: number }> {
+async function getArticlesForList(
+  q: string | null,
+  sourceId: string | null,
+  category: string | null
+): Promise<{ articles: ArticleForList[]; total: number }> {
   if (hasSupabaseDb()) {
     const { articles, total } = await getArticlesSupabase({
       limit: 50,
       offset: 0,
       sourceId: sourceId ?? undefined,
+      category: category ?? undefined,
       q: q ?? undefined,
     });
     const sources = await getSourcesSupabase();
@@ -69,16 +75,18 @@ async function getArticlesForList(q: string | null, sourceId: string | null): Pr
 async function ArticlesList({
   q,
   sourceId,
+  category,
   hasAnalyzeProvider,
 }: {
   q: string | null;
   sourceId: string | null;
+  category: string | null;
   hasAnalyzeProvider: boolean;
 }) {
   let articles: ArticleForList[];
   let total: number;
   try {
-    const data = await getArticlesForList(q, sourceId);
+    const data = await getArticlesForList(q, sourceId, category);
     articles = data.articles;
     total = data.total;
   } catch {
@@ -92,7 +100,7 @@ async function ArticlesList({
   if (articles.length === 0) {
     return (
       <p className="text-muted-foreground text-sm">
-        {q || sourceId
+        {q || sourceId || category
           ? "No articles match the filters."
           : "No articles yet. Click “Fetch news now” above to load headlines (add NEWS_API_KEY to .env locally or in Vercel)."}
       </p>
@@ -125,8 +133,16 @@ async function ArticlesList({
                     {a.summary}
                   </p>
                 )}
-                {(a.entities?.length > 0 || a.topics?.length > 0) && (
+                {(a.categories?.length > 0 || a.entities?.length > 0 || a.topics?.length > 0) && (
                   <div className="mt-3 flex flex-wrap gap-1.5 text-xs">
+                    {a.categories?.slice(0, 3).map((c) => (
+                      <span
+                        key={c}
+                        className="rounded-md border border-primary/30 bg-primary/10 px-2 py-0.5 font-medium text-primary"
+                      >
+                        {c}
+                      </span>
+                    ))}
                     {a.entities?.slice(0, 4).map((e) => (
                       <span
                         key={e}
@@ -220,6 +236,7 @@ export default async function DashboardPage({
   const params = await searchParams;
   const q = params.q ?? null;
   const sourceId = params.sourceId ?? null;
+  const category = params.category ?? null;
 
   const sources = await getSources();
 
@@ -266,6 +283,7 @@ export default async function DashboardPage({
             <ArticlesList
               q={q}
               sourceId={sourceId}
+              category={category}
               hasAnalyzeProvider={!!(process.env.GROQ_API_KEY || process.env.OPENAI_API_KEY)}
             />
           </div>

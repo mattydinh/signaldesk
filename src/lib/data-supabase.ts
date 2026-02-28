@@ -21,6 +21,7 @@ export type ArticleRow = {
   externalId: string | null;
   entities: string[];
   topics: string[];
+  categories: string[];
   opportunities: string[];
   implications: string | null;
   forShareholders: string | null;
@@ -47,13 +48,18 @@ export async function getArticlesSupabase(options: {
   limit: number;
   offset: number;
   sourceId?: string;
+  category?: string;
   q?: string;
 }): Promise<{ articles: (ArticleRow | CachedArticle)[]; total: number }> {
+  const matchCategory = (a: { categories?: string[] }) =>
+    !options.category || (Array.isArray(a.categories) && a.categories.includes(options.category!));
+
   if (hasBlobFeed()) {
     const blobFeed = await readFeedFromBlob();
     if (blobFeed && blobFeed.length > 0) {
       let list = blobFeed;
       if (options.sourceId) list = list.filter((a) => a.sourceId === options.sourceId);
+      if (options.category) list = list.filter(matchCategory);
       if (options.q?.trim()) {
         const q = options.q.trim().toLowerCase();
         list = list.filter((a) => a.title?.toLowerCase().includes(q) || (a.summary && a.summary.toLowerCase().includes(q)));
@@ -78,6 +84,7 @@ export async function getArticlesSupabase(options: {
     if (kvFeed && kvFeed.length > 0) {
       let list = kvFeed;
       if (options.sourceId) list = list.filter((a) => a.sourceId === options.sourceId);
+      if (options.category) list = list.filter(matchCategory);
       if (options.q?.trim()) {
         const q = options.q.trim().toLowerCase();
         list = list.filter((a) => a.title?.toLowerCase().includes(q) || (a.summary && a.summary.toLowerCase().includes(q)));
@@ -101,11 +108,12 @@ export async function getArticlesSupabase(options: {
   const supabase = getSupabaseAdmin();
   if (!supabase) return { articles: [], total: 0 };
   const sb = supabase as any;
-  const cols = "id,sourceId,title,summary,url,publishedAt,externalId,entities,topics,opportunities,implications,forShareholders,forInvestors,forBusiness";
+  const cols = "id,sourceId,title,summary,url,publishedAt,externalId,entities,topics,categories,opportunities,implications,forShareholders,forInvestors,forBusiness";
 
   async function run(table: string): Promise<{ data: unknown; count: number | null; error: unknown }> {
     let q = sb.from(table).select(cols, { count: "exact" }).order("publishedAt", { ascending: false }).limit(options.limit);
     if (options.sourceId) q = q.eq("sourceId", options.sourceId);
+    if (options.category) q = q.contains("categories", [options.category]);
     if (options.q?.trim()) {
       const t = options.q.trim().slice(0, 200);
       const pattern = `%${t.replace(/%/g, "\\%")}%`;
@@ -181,6 +189,7 @@ function toCachedArticle(
     externalId: a.externalId ?? null,
     entities: [],
     topics: [],
+    categories: [],
     opportunities: [],
     implications: null,
     forShareholders: null,
@@ -273,24 +282,25 @@ export async function ingestArticlesSupabase(
 /** Fetch analysis fields for multiple article ids (for merging into Blob/Kv feed). */
 async function getAnalysisBatchSupabase(
   ids: string[]
-): Promise<Map<string, Pick<ArticleRow, "entities" | "topics" | "opportunities" | "implications" | "forShareholders" | "forInvestors" | "forBusiness">>> {
+): Promise<Map<string, Pick<ArticleRow, "entities" | "topics" | "categories" | "opportunities" | "implications" | "forShareholders" | "forInvestors" | "forBusiness">>> {
   if (ids.length === 0) return new Map();
   const supabase = getSupabaseAdmin();
   if (!supabase) return new Map();
   const sb = supabase as any;
   const { data, error } = await sb
     .from(ARTICLE_TABLE)
-    .select("id, entities, topics, opportunities, implications, forShareholders, forInvestors, forBusiness")
+    .select("id, entities, topics, categories, opportunities, implications, forShareholders, forInvestors, forBusiness")
     .in("id", ids);
   if (error || !Array.isArray(data)) return new Map();
   const map = new Map<
     string,
-    Pick<ArticleRow, "entities" | "topics" | "opportunities" | "implications" | "forShareholders" | "forInvestors" | "forBusiness">
+    Pick<ArticleRow, "entities" | "topics" | "categories" | "opportunities" | "implications" | "forShareholders" | "forInvestors" | "forBusiness">
   >();
   for (const row of data as Array<ArticleRow & { id: string }>) {
     map.set(row.id, {
       entities: row.entities ?? [],
       topics: row.topics ?? [],
+      categories: row.categories ?? [],
       opportunities: row.opportunities ?? [],
       implications: row.implications ?? null,
       forShareholders: row.forShareholders ?? null,
@@ -307,7 +317,7 @@ export async function getArticleByIdSupabase(id: string): Promise<(ArticleRow & 
   const sb = supabase as any;
   const { data: article, error } = await sb
     .from(ARTICLE_TABLE)
-    .select("id, sourceId, title, summary, url, publishedAt, externalId, entities, topics, opportunities, implications, forShareholders, forInvestors, forBusiness")
+    .select("id, sourceId, title, summary, url, publishedAt, externalId, entities, topics, categories, opportunities, implications, forShareholders, forInvestors, forBusiness")
     .eq("id", id)
     .single();
   if (error || !article) return null;
@@ -327,6 +337,7 @@ export async function updateArticleAnalysisSupabase(
   data: {
     entities: string[];
     topics: string[];
+    categories: string[];
     opportunities: string[];
     implications: string | null;
     forShareholders: string | null;
