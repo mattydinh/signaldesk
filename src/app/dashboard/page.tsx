@@ -42,7 +42,7 @@ type ArticleForList = {
 async function getArticlesForList(q: string | null, sourceId: string | null): Promise<{ articles: ArticleForList[]; total: number }> {
   if (hasSupabaseDb()) {
     const { articles, total } = await getArticlesSupabase({
-      limit: 20,
+      limit: 50,
       offset: 0,
       sourceId: sourceId ?? undefined,
       q: q ?? undefined,

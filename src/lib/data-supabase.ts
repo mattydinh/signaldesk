@@ -46,20 +46,26 @@ export async function getArticlesSupabase(options: {
   const supabase = getSupabaseAdmin();
   if (!supabase) return { articles: [], total: 0 };
   const sb = supabase as any;
-  let q = sb.from(ARTICLE_TABLE).select("id, sourceId, title, summary, url, publishedAt, externalId, entities, topics, opportunities, implications, forShareholders, forInvestors, forBusiness", { count: "exact" });
-  if (options.sourceId) q = q.eq("sourceId", options.sourceId);
+  const cols = "id, sourceId, title, summary, url, publishedAt, externalId, entities, topics, opportunities, implications, forShareholders, forInvestors, forBusiness";
+  let dataQuery = sb.from(ARTICLE_TABLE).select(cols);
+  if (options.sourceId) dataQuery = dataQuery.eq("sourceId", options.sourceId);
   if (options.q?.trim()) {
     const t = options.q.trim().slice(0, 200);
     const pattern = `%${t.replace(/%/g, "\\%")}%`;
-    q = q.or(`title.ilike.${pattern},summary.ilike.${pattern}`);
+    dataQuery = dataQuery.or(`title.ilike.${pattern},summary.ilike.${pattern}`);
   }
-  const result = await q.order("publishedAt", { ascending: false, nullsFirst: false }).range(options.offset, options.offset + options.limit - 1);
+  dataQuery = dataQuery.order("publishedAt", { ascending: false, nullsFirst: false });
+  const from = options.offset;
+  const to = options.offset + options.limit - 1;
+  const result = await dataQuery.range(from, to);
   const { data, error, count } = result;
   if (error) {
     console.error("[data-supabase] getArticles", error);
     return { articles: [], total: 0 };
   }
-  return { articles: (data ?? []) as ArticleRow[], total: count ?? 0 };
+  const articles = Array.isArray(data) ? (data as ArticleRow[]) : [];
+  const total = typeof count === "number" ? count : articles.length;
+  return { articles, total };
 }
 
 export type IngestArticleInput = {
