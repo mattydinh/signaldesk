@@ -3,13 +3,10 @@
  * Used when SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are set, to avoid pooler/tenant issues on Vercel.
  */
 import { getSupabaseAdmin } from "./supabase-server";
+import { getFeedCache, setFeedCache, type CachedArticle } from "./feed-cache";
 
 const SOURCE_TABLE = process.env.SUPABASE_SOURCE_TABLE ?? "Source";
 const ARTICLE_TABLE = process.env.SUPABASE_ARTICLE_TABLE ?? "Article";
-
-function getSupabaseUrl(): string | undefined {
-  return process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
-}
 
 export type SourceRow = { id: string; name: string; slug: string };
 export type ArticleRow = {
@@ -41,53 +38,62 @@ export async function getSourcesSupabase(): Promise<SourceRow[]> {
   return (data ?? []) as SourceRow[];
 }
 
+/** Try both PascalCase and lowercase table names; PostgREST/Postgres can expose either. */
+const ARTICLE_TABLE_ALT = ARTICLE_TABLE === "Article" ? "article" : ARTICLE_TABLE === "article" ? "Article" : null;
+
 export async function getArticlesSupabase(options: {
   limit: number;
   offset: number;
   sourceId?: string;
   q?: string;
-}): Promise<{ articles: ArticleRow[]; total: number }> {
-  const url = getSupabaseUrl();
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) return { articles: [], total: 0 };
-
+}): Promise<{ articles: (ArticleRow | CachedArticle)[]; total: number }> {
+  const supabase = getSupabaseAdmin();
+  if (!supabase) return { articles: [], total: 0 };
+  const sb = supabase as any;
   const cols = "id,sourceId,title,summary,url,publishedAt,externalId,entities,topics,opportunities,implications,forShareholders,forInvestors,forBusiness";
-  const params = new URLSearchParams();
-  params.set("select", cols);
-  params.set("order", "publishedAt.desc");
-  if (options.sourceId) params.set("sourceId", `eq.${options.sourceId}`);
-  if (options.q?.trim()) {
-    const t = options.q.trim().slice(0, 200);
-    // PostgREST uses * as alias for % in ilike
-    params.set("or", `(title.ilike.*${t}*,summary.ilike.*${t}*)`);
+
+  async function run(table: string): Promise<{ data: unknown; count: number | null; error: unknown }> {
+    let q = sb.from(table).select(cols, { count: "exact" }).order("publishedAt", { ascending: false }).limit(options.limit);
+    if (options.sourceId) q = q.eq("sourceId", options.sourceId);
+    if (options.q?.trim()) {
+      const t = options.q.trim().slice(0, 200);
+      const pattern = `%${t.replace(/%/g, "\\%")}%`;
+      q = q.or(`title.ilike.${pattern},summary.ilike.${pattern}`);
+    }
+    const result = await q;
+    const count = typeof (result as { count?: number }).count === "number" ? (result as { count: number }).count : null;
+    return { data: (result as { data?: unknown }).data, count, error: (result as { error?: unknown }).error };
   }
-  const from = options.offset;
-  const to = options.offset + options.limit - 1;
-  const restUrl = `${url.replace(/\/$/, "")}/rest/v1/${ARTICLE_TABLE}?${params.toString()}`;
-  const res = await fetch(restUrl, {
-    method: "GET",
-    headers: {
-      apikey: key,
-      Authorization: `Bearer ${key}`,
-      "Content-Type": "application/json",
-      Prefer: "count=exact",
-      Range: `${from}-${to}`,
-    },
-    cache: "no-store",
-  });
-  if (!res.ok) {
-    const err = await res.text();
-    console.error("[data-supabase] getArticles", res.status, err);
-    return { articles: [], total: 0 };
+
+  let out = await run(ARTICLE_TABLE);
+  if (out.error) {
+    console.error("[data-supabase] getArticles", ARTICLE_TABLE, out.error);
+    if (ARTICLE_TABLE_ALT) {
+      out = await run(ARTICLE_TABLE_ALT);
+      if (out.error) {
+        console.error("[data-supabase] getArticles fallback", ARTICLE_TABLE_ALT, out.error);
+        return { articles: [], total: 0 };
+      }
+    } else {
+      return { articles: [], total: 0 };
+    }
   }
-  const articles = (await res.json()) as ArticleRow[];
-  const contentRange = res.headers.get("Content-Range") ?? res.headers.get("content-range");
-  let total = Array.isArray(articles) ? articles.length : 0;
-  if (contentRange) {
-    const match = contentRange.match(/\/(\d+)$/);
-    if (match) total = parseInt(match[1], 10);
+  let articles = Array.isArray(out.data) ? (out.data as ArticleRow[]) : [];
+  let total = out.count ?? articles.length;
+  if (articles.length <= 1 && total <= 1 && ARTICLE_TABLE_ALT) {
+    const alt = await run(ARTICLE_TABLE_ALT);
+    if (!alt.error && Array.isArray(alt.data) && (alt.data as ArticleRow[]).length > articles.length) {
+      articles = alt.data as ArticleRow[];
+      total = alt.count ?? articles.length;
+    }
   }
-  return { articles: Array.isArray(articles) ? articles : [], total };
+  if (articles.length <= 1) {
+    const cached = getFeedCache();
+    if (cached.length > articles.length) {
+      return { articles: cached, total: cached.length };
+    }
+  }
+  return { articles, total };
 }
 
 export type IngestArticleInput = {
@@ -168,6 +174,25 @@ export async function ingestArticlesSupabase(
     }
     created++;
   }
+
+  const cacheEntries: CachedArticle[] = articles.map((a, i) => ({
+    id: `cache-${i}-${(a.url ?? a.title).slice(0, 40)}`,
+    sourceId: "",
+    title: a.title,
+    summary: a.summary ?? null,
+    url: a.url ?? null,
+    publishedAt: a.publishedAt ?? null,
+    externalId: a.externalId ?? null,
+    entities: [],
+    topics: [],
+    opportunities: [],
+    implications: null,
+    forShareholders: null,
+    forInvestors: null,
+    forBusiness: null,
+    sourceName: a.sourceName,
+  }));
+  setFeedCache(cacheEntries);
 
   return { created, skipped, total: articles.length };
 }

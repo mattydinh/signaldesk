@@ -51,7 +51,9 @@ async function getArticlesForList(q: string | null, sourceId: string | null): Pr
     const sourceMap = new Map(sources.map((s) => [s.id, s.name]));
     const articlesWithSource: ArticleForList[] = articles.map((a) => ({
       ...a,
-      source: { name: sourceMap.get(a.sourceId) ?? "Unknown" },
+      source: {
+        name: (a as { sourceName?: string }).sourceName ?? sourceMap.get(a.sourceId) ?? "Unknown",
+      },
     }));
     return { articles: articlesWithSource, total };
   }
@@ -188,7 +190,7 @@ async function ArticlesList({
                 )}
               </div>
               <div className="flex shrink-0 items-center gap-2">
-                <AnalyzeButton articleId={a.id} />
+                {!a.id.startsWith("cache-") && <AnalyzeButton articleId={a.id} />}
                 {a.url && (
                   <a
                     href={a.url}
