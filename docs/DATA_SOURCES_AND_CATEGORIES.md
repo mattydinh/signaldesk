@@ -12,6 +12,7 @@ Articles are tagged with 1–3 categories at analysis time. The AI chooses from 
 | Geopolitics | International relations, sanctions, alliances |
 | War & Conflict | Armed conflict, military, security |
 | Technology | Software, hardware, platforms, innovation |
+| Entertainment | Gaming, video games, film, TV, streaming, media |
 | Regulation | Laws, regulators, compliance |
 | Markets | Equities, bonds, commodities, trading |
 | Energy | Oil, gas, renewables, utilities |
