@@ -36,12 +36,12 @@ export default function AnalyzeButton({ articleId }: { articleId: string }) {
         disabled={loading}
         aria-busy={loading}
         aria-label={loading ? "Analyzing article…" : "Run AI analysis on this article"}
-        className="shrink-0 rounded-btn border-2 border-primary/50 bg-primary/10 px-4 py-2 text-caption font-semibold text-primary hover:bg-primary/20 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:opacity-50 transition-colors"
+        className="shrink-0 rounded-badge border border-[#27272A] bg-transparent px-4 py-2 text-body font-medium text-foreground hover:bg-[#18181B] focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:opacity-50 transition-colors duration-150"
       >
         {loading ? "Analyzing…" : "Analyze"}
       </button>
       {error && (
-        <span className="text-caption text-destructive" role="alert">
+        <span className="text-meta text-[#F87171]" role="alert">
           {error}
         </span>
       )}

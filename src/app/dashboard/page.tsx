@@ -101,31 +101,31 @@ async function ArticlesList({
 
   return (
     <>
-      <p className="text-caption font-medium text-muted-foreground">
+      <p className="text-meta font-medium text-[#A1A1AA]">
         {total} article{total !== 1 ? "s" : ""}
       </p>
-      <ul className="mt-6 space-y-6" role="list" aria-label="Intelligence feed articles">
+      <ul className="mt-6 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3" role="list" aria-label="Intelligence feed articles">
         {articles.map((a) => (
           <li
             key={a.id}
-            className="glass-card card-hover accent-bar rounded-card p-6 pl-7"
+            className="glass-card card-hover accent-bar rounded-card border border-[#27272A] p-6"
             aria-labelledby={`article-title-${a.id}`}
           >
-            <div className="flex items-start justify-between gap-4">
+            <div className="flex flex-col gap-4">
               <div className="min-w-0 flex-1">
-                <span className="text-caption font-medium text-muted-foreground">
+                <span className="text-meta text-[#71717A]">
                   {a.source.name}
                   {a.publishedAt &&
                     ` · ${new Date(a.publishedAt).toLocaleDateString()}`}
                 </span>
                 <h2
                   id={`article-title-${a.id}`}
-                  className="mt-2 text-body font-semibold leading-snug text-card-foreground sm:text-body-lg"
+                  className="mt-2 text-card-title text-foreground"
                 >
                   {a.title}
                 </h2>
                 {a.summary && (
-                  <p className="mt-2 text-body-sm text-muted-foreground line-clamp-2 leading-relaxed">
+                  <p className="mt-2 text-body text-[#A1A1AA] line-clamp-2 leading-relaxed">
                     {a.summary}
                   </p>
                 )}
@@ -135,7 +135,7 @@ async function ArticlesList({
                     return (
                       <span
                         key={c}
-                        className="rounded-md border px-2.5 py-1 text-caption font-medium"
+                        className="rounded-badge border px-3 py-1 text-meta font-medium"
                         style={{
                           backgroundColor: tagStyle.backgroundColor,
                           color: tagStyle.color,
@@ -149,7 +149,7 @@ async function ArticlesList({
                   {a.entities?.slice(0, 4).map((e) => (
                     <span
                       key={e}
-                      className="rounded-md bg-muted/80 px-2.5 py-1 text-caption text-muted-foreground"
+                      className="rounded-badge bg-[#18181B]/80 px-3 py-1 text-meta text-[#A1A1AA]"
                     >
                       {e}
                     </span>
@@ -157,25 +157,25 @@ async function ArticlesList({
                   {a.topics?.slice(0, 3).map((t) => (
                     <span
                       key={t}
-                      className="rounded-md bg-primary/15 px-2.5 py-1 text-caption font-medium text-primary"
+                      className="rounded-badge signal-neutral px-3 py-1 text-meta font-medium"
                     >
                       {t}
                     </span>
                   ))}
                 </div>
                 {a.implications && (
-                  <p className="mt-4 text-body-sm font-medium leading-relaxed text-primary">
+                  <p className="mt-4 text-body font-medium leading-relaxed signal-positive">
                     {a.implications}
                   </p>
                 )}
                 {(a.opportunities?.length > 0 || a.forShareholders || a.forInvestors || a.forBusiness) && (
-                  <div className="mt-6 space-y-4 rounded-btn border border-border/60 bg-muted/20 p-5 text-body-sm">
+                  <div className="mt-6 space-y-4 rounded-card border border-[#27272A] bg-[#18181B]/40 p-5 text-body">
                     {a.opportunities?.length > 0 && (
                       <div>
-                        <h3 className="mb-2 text-overline uppercase tracking-wide text-muted-foreground">
+                        <h3 className="mb-2 text-meta uppercase tracking-wide text-[#71717A]">
                           Opportunities
                         </h3>
-                        <ul className="list-inside list-disc space-y-1 text-card-foreground">
+                        <ul className="list-inside list-disc space-y-1 text-foreground">
                           {a.opportunities.map((opp) => (
                             <li key={opp}>{opp}</li>
                           ))}
@@ -184,39 +184,39 @@ async function ArticlesList({
                     )}
                     {a.forShareholders && (
                       <div>
-                        <h3 className="mb-1 text-overline uppercase tracking-wide text-muted-foreground">
+                        <h3 className="mb-1 text-meta uppercase tracking-wide text-[#71717A]">
                           For shareholders
                         </h3>
-                        <p className="text-card-foreground">{a.forShareholders}</p>
+                        <p className="text-foreground">{a.forShareholders}</p>
                       </div>
                     )}
                     {a.forInvestors && (
                       <div>
-                        <h3 className="mb-1 text-overline uppercase tracking-wide text-muted-foreground">
+                        <h3 className="mb-1 text-meta uppercase tracking-wide text-[#71717A]">
                           For investors
                         </h3>
-                        <p className="text-card-foreground">{a.forInvestors}</p>
+                        <p className="text-foreground">{a.forInvestors}</p>
                       </div>
                     )}
                     {a.forBusiness && (
                       <div>
-                        <h3 className="mb-1 text-overline uppercase tracking-wide text-muted-foreground">
+                        <h3 className="mb-1 text-meta uppercase tracking-wide text-[#71717A]">
                           For business
                         </h3>
-                        <p className="text-card-foreground">{a.forBusiness}</p>
+                        <p className="text-foreground">{a.forBusiness}</p>
                       </div>
                     )}
                   </div>
                 )}
               </div>
-              <div className="flex shrink-0 items-start gap-2">
+              <div className="flex shrink-0 items-center gap-2 mt-auto">
                 {hasAnalyzeProvider && !a.id.startsWith("cache-") && <AnalyzeButton articleId={a.id} />}
                 {a.url && (
                   <a
                     href={a.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="rounded-btn border border-border bg-secondary px-4 py-2 text-caption font-medium text-secondary-foreground hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                    className="rounded-badge border border-[#27272A] bg-[#18181B] px-4 py-2 text-body font-medium text-foreground hover:bg-[#27272A] focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background transition-colors duration-150"
                     aria-label="Open article in new tab"
                   >
                     Open
@@ -242,26 +242,38 @@ export default async function DashboardPage({
 
   return (
     <div className="min-h-screen gradient-mesh">
-      <header className="sticky top-0 z-10 glass border-b border-border/60 px-6 py-4">
-        <div className="mx-auto flex max-w-4xl items-center justify-between">
-          <nav className="flex items-center gap-6" aria-label="Main">
+      <header className="sticky top-0 z-10 glass h-16">
+        <div className="mx-auto flex h-full max-w-feed items-center justify-between px-4 sm:px-6 lg:px-8">
+          <nav className="flex items-center gap-8" aria-label="Main">
             <Link
               href="/"
-              className="text-body-lg font-bold tracking-tight text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:rounded-btn"
+              className="text-body font-semibold text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:rounded-btn"
             >
               SignalDesk
             </Link>
             <Link
               href="/dashboard"
-              className="text-body-sm text-muted-foreground hover:text-foreground focus-visible:underline transition-colors"
+              className="text-body text-[#FAFAFA] focus-visible:underline"
             >
-              Feed
+              Dashboard
             </Link>
             <Link
               href="/weekly"
-              className="text-body-sm text-muted-foreground hover:text-foreground focus-visible:underline transition-colors"
+              className="text-body text-[#A1A1AA] hover:text-[#FAFAFA] focus-visible:underline transition-colors"
             >
               Weekly
+            </Link>
+            <Link
+              href="/dashboard"
+              className="text-body text-[#A1A1AA] hover:text-[#FAFAFA] focus-visible:underline transition-colors"
+            >
+              Signals
+            </Link>
+            <Link
+              href="/dashboard"
+              className="text-body text-[#A1A1AA] hover:text-[#FAFAFA] focus-visible:underline transition-colors"
+            >
+              Articles
             </Link>
           </nav>
           <div className="flex items-center gap-4">
@@ -269,39 +281,39 @@ export default async function DashboardPage({
               <form action="/api/auth/logout" method="POST" className="inline">
                 <button
                   type="submit"
-                  className="text-body-sm text-muted-foreground hover:text-foreground focus-visible:underline transition-colors"
+                  className="text-body text-[#A1A1AA] hover:text-foreground focus-visible:underline transition-colors"
                 >
                   Sign out
                 </button>
               </form>
             ) : null}
-            <span className="hidden text-body-sm text-muted-foreground sm:inline">
+            <span className="hidden text-body text-[#A1A1AA] sm:inline">
               Financial & Political Intelligence
             </span>
           </div>
         </div>
       </header>
-      <main id="main" className="mx-auto max-w-4xl px-6 py-10">
-        <section className="mb-10" aria-labelledby="feed-heading">
-          <h1 id="feed-heading" className="text-display-sm text-foreground tracking-tight sm:text-display-md">
+      <main id="main" className="mx-auto max-w-feed px-4 py-16 sm:px-6 lg:px-8">
+        <section className="space-y-4 mb-16" aria-labelledby="feed-heading">
+          <h1 id="feed-heading" className="text-page-title text-foreground">
             Intelligence feed
           </h1>
-          <p className="mt-2 text-body-sm text-muted-foreground">
+          <p className="text-body text-[#A1A1AA]">
             Opportunities and implications for shareholders, investors, and business leaders.
           </p>
-          <p className="mt-4 text-body-sm text-muted-foreground max-w-2xl">
+          <p className="text-body text-[#71717A] max-w-2xl">
             This feed continuously aggregates and analyzes relevant finance and political news, updating in real time. New articles are added regularly to keep you informed.
           </p>
         </section>
 
-        <section className="mb-10" aria-label="Filters and actions">
+        <section className="mb-16" aria-label="Filters and actions">
           <div className="flex flex-wrap items-end gap-6">
             <DashboardFilters />
             <FetchNewsButton />
           </div>
         </section>
 
-        <section aria-label="Article list">
+        <section aria-label="Article list" className="space-y-16">
           <Suspense
             fallback={
               <p className="text-body-sm text-muted-foreground animate-pulse">Loading articles…</p>

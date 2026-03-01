@@ -10,7 +10,10 @@ const config: Config = {
   theme: {
     extend: {
       fontFamily: {
-        sans: ["Plus Jakarta Sans", "ui-sans-serif", "system-ui", "sans-serif"],
+        sans: ["Inter", "ui-sans-serif", "system-ui", "sans-serif"],
+      },
+      maxWidth: {
+        "feed": "1200px",
       },
       spacing: {
         18: "4.5rem",
@@ -18,14 +21,11 @@ const config: Config = {
         30: "7.5rem",
       },
       fontSize: {
-        "display-lg": ["2.25rem", { lineHeight: "2.5rem", fontWeight: "700" }],
-        "display-md": ["1.875rem", { lineHeight: "2.25rem", fontWeight: "700" }],
-        "display-sm": ["1.5rem", { lineHeight: "2rem", fontWeight: "600" }],
-        "body-lg": ["1.125rem", { lineHeight: "1.75rem" }],
-        "body": ["1rem", { lineHeight: "1.5rem" }],
-        "body-sm": ["0.875rem", { lineHeight: "1.25rem" }],
-        "caption": ["0.75rem", { lineHeight: "1rem" }],
-        "overline": ["0.6875rem", { lineHeight: "1rem", fontWeight: "600", letterSpacing: "0.05em" }],
+        "page-title": ["36px", { lineHeight: "1.2", fontWeight: "600", letterSpacing: "-0.02em" }],
+        "section-header": ["24px", { lineHeight: "1.3", fontWeight: "600" }],
+        "card-title": ["18px", { lineHeight: "1.4", fontWeight: "500" }],
+        "body": ["14px", { lineHeight: "1.6", fontWeight: "400" }],
+        "meta": ["12px", { lineHeight: "1.4", fontWeight: "400" }],
       },
       colors: {
         border: "hsl(var(--border))",
@@ -38,11 +38,16 @@ const config: Config = {
         destructive: { DEFAULT: "hsl(var(--destructive))", foreground: "hsl(var(--destructive-foreground))" },
         muted: { DEFAULT: "hsl(var(--muted))", foreground: "hsl(var(--muted-foreground))" },
         accent: { DEFAULT: "hsl(var(--accent))", foreground: "hsl(var(--accent-foreground))" },
-        card: { DEFAULT: "hsl(var(--card))", foreground: "hsl(var(--card-foreground))" },
+        card: { DEFAULT: "hsl(var(--card))", foreground: "hsl(var(--foreground))" },
       },
       borderRadius: {
-        "card": "0.75rem",
-        "btn": "0.5rem",
+        "card": "20px",
+        "pill": "999px",
+        "badge": "8px",
+        "btn": "8px",
+      },
+      transitionDuration: {
+        "150": "150ms",
       },
     },
   },

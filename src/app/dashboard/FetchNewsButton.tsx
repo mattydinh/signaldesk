@@ -61,13 +61,13 @@ export default function FetchNewsButton() {
         disabled={status === "loading" || status === "analyzing"}
         aria-busy={status === "loading" || status === "analyzing"}
         aria-live="polite"
-        className="rounded-btn gradient-primary px-6 py-3 text-body-sm font-semibold text-primary-foreground shadow-md shadow-primary/20 hover:opacity-95 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:opacity-50 transition-opacity"
+        className="rounded-badge bg-primary px-6 py-2.5 text-body font-semibold text-primary-foreground hover:opacity-95 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:opacity-50 transition-all duration-150"
       >
         {status === "loading" ? "Fetching…" : status === "analyzing" ? "Analyzing…" : "Fetch news now"}
       </button>
       {message && (
         <p
-          className={`text-body-sm ${status === "error" ? "text-destructive" : "text-muted-foreground"}`}
+          className={`text-body ${status === "error" ? "text-[#F87171]" : "text-[#A1A1AA]"}`}
           role="status"
         >
           {message}
