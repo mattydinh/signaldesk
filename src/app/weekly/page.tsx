@@ -19,10 +19,16 @@ function escalationLabel(score: number | null): string {
 }
 
 export default async function WeeklyPage() {
-  const summaries = await prisma.weeklySummary.findMany({
-    orderBy: { weekStart: "desc" },
-    take: 4,
-  });
+  let summaries: Awaited<ReturnType<typeof prisma.weeklySummary.findMany>> = [];
+  try {
+    summaries = await prisma.weeklySummary.findMany({
+      orderBy: { weekStart: "desc" },
+      take: 4,
+    });
+  } catch (e) {
+    // Table may not exist yet (run prisma/scripts/create-weekly-summary-table.sql in Supabase)
+    console.error("[weekly] fetch error", e);
+  }
 
   return (
     <div className="min-h-screen gradient-mesh">
@@ -77,9 +83,14 @@ export default async function WeeklyPage() {
         </section>
 
         {summaries.length === 0 ? (
-          <p className="mt-10 text-body-sm text-muted-foreground">
-            No briefs yet. The first one will appear after the weekly job runs (Sundays at 6 PM UTC).
-          </p>
+          <div className="mt-10 space-y-4 text-body-sm text-muted-foreground">
+            <p>No briefs yet. The first one will appear after the weekly job runs (Sundays at 6 PM UTC).</p>
+            <p className="rounded-card border border-border/60 bg-muted/20 p-4 text-caption">
+              <strong className="text-foreground">One-time setup:</strong> If this is your first time, run the SQL in{" "}
+              <code className="rounded bg-muted px-1">prisma/scripts/create-weekly-summary-table.sql</code> in Supabase
+              → SQL Editor so the Weekly Summary table exists.
+            </p>
+          </div>
         ) : (
           <ul className="mt-10 space-y-6" role="list" aria-label="Weekly briefs">
             {summaries.map((s) => {

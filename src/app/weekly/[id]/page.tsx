@@ -23,7 +23,12 @@ export default async function WeeklyDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const summary = await prisma.weeklySummary.findUnique({ where: { id } });
+  let summary = null;
+  try {
+    summary = await prisma.weeklySummary.findUnique({ where: { id } });
+  } catch (e) {
+    console.error("[weekly/[id]] fetch error", e);
+  }
   if (!summary) notFound();
 
   const trends = Array.isArray(summary.keyTrends) ? (summary.keyTrends as string[]) : [];
