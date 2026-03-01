@@ -7,6 +7,7 @@ import { getFeedCache, setFeedCache, type CachedArticle } from "./feed-cache";
 import { hasBlobFeed, readFeedFromBlob, writeFeedToBlob } from "./feed-blob";
 import { hasKvFeed, readFeedFromKv, writeFeedToKv } from "./feed-kv";
 import { inferCategoriesFromText } from "./categories";
+import { createEventFromArticle } from "./events";
 
 const SOURCE_TABLE = process.env.SUPABASE_SOURCE_TABLE ?? "Source";
 const ARTICLE_TABLE = process.env.SUPABASE_ARTICLE_TABLE ?? "Article";
@@ -319,6 +320,13 @@ export async function ingestArticlesSupabase(
     created++;
     newArticleIds.push(newId);
     feedEntries.push(toCachedArticle(a, newId, sourceId));
+    await createEventFromArticle({
+      id: newId,
+      title: a.title,
+      summary: a.summary ?? null,
+      url: a.url ?? null,
+      publishedAt: publishedAt ?? undefined,
+    });
   }
 
   if (feedEntries.length > 0) {

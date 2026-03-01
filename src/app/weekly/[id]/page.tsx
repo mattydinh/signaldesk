@@ -49,7 +49,8 @@ export default async function WeeklyDetailPage({
               SignalDesk
             </Link>
             <Link href="/dashboard" className="text-body text-[#A1A1AA] hover:text-[#FAFAFA] focus-visible:underline transition-colors">Dashboard</Link>
-            <Link href="/weekly" className="text-body text-[#FAFAFA] focus-visible:underline">Weekly</Link>
+            <Link href="/weekly" className="text-body text-[#A1A1AA] hover:text-[#FAFAFA] focus-visible:underline transition-colors">Weekly</Link>
+            <Link href="/intelligence" className="text-body text-[#A1A1AA] hover:text-[#FAFAFA] focus-visible:underline transition-colors">Intelligence</Link>
           </nav>
           <div className="flex items-center gap-4">
             {process.env.DASHBOARD_PASSWORD ? (

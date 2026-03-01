@@ -263,6 +263,12 @@ export default async function DashboardPage({
             >
               Weekly
             </Link>
+            <Link
+              href="/intelligence"
+              className="text-body text-[#A1A1AA] hover:text-[#FAFAFA] focus-visible:underline transition-colors"
+            >
+              Intelligence
+            </Link>
           </nav>
           <div className="flex items-center gap-4">
             {process.env.DASHBOARD_PASSWORD ? (

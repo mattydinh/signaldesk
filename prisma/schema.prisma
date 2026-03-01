@@ -62,3 +62,93 @@ model WeeklySummary {
   @@unique([weekStart])
   @@index([weekStart(sort: Desc)])
 }
+
+// ---- ML pipeline (unified event model + derived signals) ----
+
+model Event {
+  id          String   @id @default(cuid())
+  source      String   // "news" | "twitter"
+  publishedAt DateTime @map("published_at")
+  rawText     String   @db.Text @map("raw_text")
+  cleanText   String?  @db.Text @map("clean_text")
+  entities    String[] @default([])
+  categories  String[] @default([])
+  url         String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  features   EventFeature?
+
+  @@index([publishedAt(sort: Desc)])
+  @@index([source])
+}
+
+model EventFeature {
+  eventId               String   @id @map("event_id")
+  event                 Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  sentimentScore        Float    @map("sentiment_score")
+  sentimentConfidence   Float    @map("sentiment_confidence")
+  regulationScore       Float    @map("regulation_score")
+  geopoliticalRiskScore Float    @map("geopolitical_risk_score")
+  createdAt             DateTime @default(now()) @map("created_at")
+}
+
+model DailyTopicMetric {
+  topic            String   @map("topic")
+  date             DateTime @db.Date @map("date")
+  articleCount     Int      @map("article_count")
+  avgSentiment     Float    @map("avg_sentiment")
+  sentimentStd     Float    @map("sentiment_std")
+  sentimentChange7d Float   @map("sentiment_change_7d")
+  volumeZscore     Float    @map("volume_zscore")
+
+  @@id([topic, date])
+  @@index([date(sort: Desc)])
+}
+
+model DerivedSignal {
+  date        DateTime @db.Date @map("date")
+  signalName  String   @map("signal_name")
+  value       Float    @map("value")
+  zscore      Float    @map("zscore")
+  confidence  Float    @map("confidence")
+
+  @@id([date, signalName])
+  @@index([signalName])
+  @@index([date(sort: Desc)])
+}
+
+model MarketPrice {
+  ticker      String   @map("ticker")
+  date        DateTime @db.Date @map("date")
+  open        Float    @map("open")
+  high        Float    @map("high")
+  low         Float    @map("low")
+  close       Float    @map("close")
+  volume      BigInt   @map("volume")
+  dailyReturn Float    @map("daily_return")
+
+  @@id([ticker, date])
+  @@index([date(sort: Desc)])
+}
+
+model RegimeSnapshot {
+  date       DateTime @id @db.Date @map("date")
+  regime     String   @map("regime")
+  confidence Float    @map("confidence")
+  drivers    String[] @default([]) @map("drivers")
+}
+
+model BacktestResult {
+  signalName          String   @map("signal_name")
+  ticker              String   @map("ticker")
+  startDate           DateTime @db.Date @map("start_date")
+  endDate             DateTime @db.Date @map("end_date")
+  cumulativeReturn    Float    @map("cumulative_return")
+  annualizedReturn    Float    @map("annualized_return")
+  annualizedVolatility Float   @map("annualized_volatility")
+  sharpe              Float    @map("sharpe")
+  maxDrawdown         Float    @map("max_drawdown")
+  turnover            Float    @map("turnover")
+  hitRate             Float    @map("hit_rate")
+
+  @@id([signalName, ticker, startDate, endDate])
+}
