@@ -56,24 +56,33 @@ export async function getArticlesSupabase(options: {
   q?: string;
   /** Only return articles with publishedAt on or after (now - retentionDays). Omit or 0 = no filter. */
   retentionDays?: number;
+  /** When set with windowEnd, filter to publishedAt in [windowStart, windowEnd] (ignores retentionDays). */
+  windowStart?: string;
+  windowEnd?: string;
 }): Promise<{ articles: (ArticleRow | CachedArticle)[]; total: number }> {
   const matchCategory = (a: { categories?: string[] }) =>
     !options.category || (Array.isArray(a.categories) && a.categories.includes(options.category!));
   const retentionDays = options.retentionDays ?? DEFAULT_RETENTION_DAYS;
-  const publishedAfter =
-    retentionDays > 0
+  const useWindow = options.windowStart != null && options.windowEnd != null;
+  const publishedAfter = useWindow
+    ? options.windowStart!
+    : retentionDays > 0
       ? new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000).toISOString()
       : null;
+  const publishedBefore = useWindow ? options.windowEnd! : null;
 
   if (hasBlobFeed()) {
     const blobFeed = await readFeedFromBlob();
     if (blobFeed && blobFeed.length > 0) {
       let list = blobFeed;
       if (publishedAfter) list = list.filter((a) => !a.publishedAt || a.publishedAt >= publishedAfter);
+      if (publishedBefore) list = list.filter((a) => !a.publishedAt || a.publishedAt <= publishedBefore);
       if (options.sourceId) list = list.filter((a) => a.sourceId === options.sourceId);
       if (options.category) {
-        const idsWithCategory = await getArticleIdsByCategorySupabase(options.category);
-        list = list.filter((a) => idsWithCategory.has(a.id));
+        list = list.filter((a) => {
+          const categories = a.categories?.length ? a.categories : inferCategoriesFromText(a.title ?? null, a.summary ?? null);
+          return categories.includes(options.category!);
+        });
       }
       if (options.q?.trim()) {
         const q = options.q.trim().toLowerCase();
@@ -104,10 +113,13 @@ export async function getArticlesSupabase(options: {
     if (kvFeed && kvFeed.length > 0) {
       let list = kvFeed;
       if (publishedAfter) list = list.filter((a) => !a.publishedAt || a.publishedAt >= publishedAfter);
+      if (publishedBefore) list = list.filter((a) => !a.publishedAt || a.publishedAt <= publishedBefore);
       if (options.sourceId) list = list.filter((a) => a.sourceId === options.sourceId);
       if (options.category) {
-        const idsWithCategory = await getArticleIdsByCategorySupabase(options.category);
-        list = list.filter((a) => idsWithCategory.has(a.id));
+        list = list.filter((a) => {
+          const categories = a.categories?.length ? a.categories : inferCategoriesFromText(a.title ?? null, a.summary ?? null);
+          return categories.includes(options.category!);
+        });
       }
       if (options.q?.trim()) {
         const q = options.q.trim().toLowerCase();
@@ -142,6 +154,7 @@ export async function getArticlesSupabase(options: {
   async function run(table: string): Promise<{ data: unknown; count: number | null; error: unknown }> {
     let q = sb.from(table).select(cols, { count: "exact" }).order("publishedAt", { ascending: false }).limit(options.limit);
     if (publishedAfter) q = q.gte("publishedAt", publishedAfter);
+    if (publishedBefore) q = q.lte("publishedAt", publishedBefore);
     if (options.sourceId) q = q.eq("sourceId", options.sourceId);
     if (options.category) q = q.contains("categories", [options.category]);
     if (options.q?.trim()) {

@@ -244,12 +244,26 @@ export default async function DashboardPage({
     <div className="min-h-screen gradient-mesh">
       <header className="sticky top-0 z-10 glass border-b border-border/60 px-6 py-4">
         <div className="mx-auto flex max-w-4xl items-center justify-between">
-          <Link
-            href="/"
-            className="text-body-lg font-bold tracking-tight text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:rounded-btn"
-          >
-            SignalDesk
-          </Link>
+          <nav className="flex items-center gap-6" aria-label="Main">
+            <Link
+              href="/"
+              className="text-body-lg font-bold tracking-tight text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:rounded-btn"
+            >
+              SignalDesk
+            </Link>
+            <Link
+              href="/dashboard"
+              className="text-body-sm text-muted-foreground hover:text-foreground focus-visible:underline transition-colors"
+            >
+              Feed
+            </Link>
+            <Link
+              href="/weekly"
+              className="text-body-sm text-muted-foreground hover:text-foreground focus-visible:underline transition-colors"
+            >
+              Weekly
+            </Link>
+          </nav>
           <div className="flex items-center gap-4">
             {process.env.DASHBOARD_PASSWORD ? (
               <form action="/api/auth/logout" method="POST" className="inline">

@@ -46,3 +46,19 @@ model Article {
   @@index([publishedAt(sort: Desc)])
   @@index([createdAt(sort: Desc)])
 }
+
+model WeeklySummary {
+  id                 String   @id @default(cuid())
+  weekStart          DateTime
+  weekEnd            DateTime
+  title              String
+  summaryText        String   @db.Text
+  keyTrends          Json     // array of strings
+  impactedSectors    Json     // array of { sector, direction, reasoning }
+  geopoliticalScore Float?
+  investorSignal     Json     // { geopoliticalAssessment?, investorImplications? }
+  createdAt          DateTime @default(now())
+
+  @@unique([weekStart])
+  @@index([weekStart(sort: Desc)])
+}

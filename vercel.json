@@ -1,6 +1,7 @@
 {
   "crons": [
     { "path": "/api/cron/ingest-news", "schedule": "0 9 * * *" },
-    { "path": "/api/cron/prune-articles", "schedule": "0 4 * * *" }
+    { "path": "/api/cron/prune-articles", "schedule": "0 4 * * *" },
+    { "path": "/api/cron/generate-weekly-summary", "schedule": "0 18 * * 0" }
   ]
 }
