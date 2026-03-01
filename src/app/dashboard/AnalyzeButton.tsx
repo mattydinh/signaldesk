@@ -34,11 +34,17 @@ export default function AnalyzeButton({ articleId }: { articleId: string }) {
         type="button"
         onClick={handleAnalyze}
         disabled={loading}
-        className="shrink-0 rounded-lg border-2 border-primary/40 bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/20 disabled:opacity-50 transition-colors"
+        aria-busy={loading}
+        aria-label={loading ? "Analyzing article…" : "Run AI analysis on this article"}
+        className="shrink-0 rounded-btn border-2 border-primary/50 bg-primary/10 px-4 py-2 text-caption font-semibold text-primary hover:bg-primary/20 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:opacity-50 transition-colors"
       >
         {loading ? "Analyzing…" : "Analyze"}
       </button>
-      {error && <span className="text-xs text-destructive">{error}</span>}
+      {error && (
+        <span className="text-caption text-destructive" role="alert">
+          {error}
+        </span>
+      )}
     </div>
   );
 }

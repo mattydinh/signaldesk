@@ -59,13 +59,16 @@ export default function FetchNewsButton() {
         type="button"
         onClick={handleClick}
         disabled={status === "loading" || status === "analyzing"}
-        className="rounded-lg gradient-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-md shadow-primary/20 hover:opacity-95 disabled:opacity-50 transition-opacity"
+        aria-busy={status === "loading" || status === "analyzing"}
+        aria-live="polite"
+        className="rounded-btn gradient-primary px-6 py-3 text-body-sm font-semibold text-primary-foreground shadow-md shadow-primary/20 hover:opacity-95 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:opacity-50 transition-opacity"
       >
         {status === "loading" ? "Fetching…" : status === "analyzing" ? "Analyzing…" : "Fetch news now"}
       </button>
       {message && (
         <p
-          className={`text-sm ${status === "error" ? "text-destructive" : "text-muted-foreground"}`}
+          className={`text-body-sm ${status === "error" ? "text-destructive" : "text-muted-foreground"}`}
+          role="status"
         >
           {message}
         </p>

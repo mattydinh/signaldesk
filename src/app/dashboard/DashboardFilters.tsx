@@ -15,20 +15,31 @@ export default function DashboardFilters() {
   }, [q, router]);
 
   return (
-    <div className="flex flex-wrap items-end gap-3">
-      <div className="min-w-[200px] flex-1">
-        <label htmlFor="search" className="block text-xs font-medium text-muted-foreground">
+    <div className="flex flex-wrap items-end gap-4">
+      <div className="min-w-[200px] flex-1 max-w-md">
+        <label htmlFor="search" className="block text-caption font-medium text-muted-foreground">
           Search
         </label>
-        <input
-          id="search"
-          type="search"
-          placeholder="Search title or summary..."
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && search()}
-          className="mt-1 block w-full rounded-lg border border-input bg-card px-3 py-2 text-sm placeholder:text-muted-foreground/70 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50 transition-shadow"
-        />
+        <div className="mt-2 flex gap-2">
+          <input
+            id="search"
+            type="search"
+            role="searchbox"
+            aria-label="Search articles by title or summary"
+            placeholder="Search title or summary..."
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), search())}
+            className="block w-full rounded-btn border border-input bg-card px-4 py-3 text-body-sm text-foreground placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:border-transparent"
+          />
+          <button
+            type="button"
+            onClick={search}
+            className="shrink-0 rounded-btn border border-border bg-secondary px-4 py-3 text-body-sm font-medium text-secondary-foreground hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+          >
+            Search
+          </button>
+        </div>
       </div>
     </div>
   );
