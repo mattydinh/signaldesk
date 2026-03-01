@@ -66,24 +66,38 @@ export async function GET(request: NextRequest) {
         .select("id")
         .single();
       if (sourceErr) {
-        errors.push(`Source ${a.sourceName}: ${(sourceErr as Error)?.message ?? String(sourceErr)}`);
-        continue;
+        const dup = String(sourceErr).includes("duplicate") || String(sourceErr).includes("unique");
+        let resolvedId: string | null = null;
+        if (dup) {
+          const { data: existing } = await sb.from(SOURCE_TABLE).select("id").eq("slug", slug).maybeSingle();
+          resolvedId = (existing as { id: string })?.id ?? null;
+        }
+        if (!resolvedId) {
+          errors.push(`Source ${a.sourceName}: ${(sourceErr as Error)?.message ?? String(sourceErr)}`);
+          continue;
+        }
+        sourceId = resolvedId;
+      } else {
+        sourceId = (newSource as { id: string })?.id ?? newSourceId;
       }
-      sourceId = (newSource as { id: string })?.id ?? newSourceId;
     }
 
     const publishedAt = a.publishedAt ? new Date(a.publishedAt).toISOString() : null;
+    const now = new Date().toISOString();
+    const articleId = a.id?.startsWith("cache-") ? randomUUID() : a.id;
     const { error: upsertErr } = await sb
       .from(ARTICLE_TABLE)
       .upsert(
         {
-          id: a.id,
+          id: articleId,
           sourceId,
           title: a.title,
           summary: a.summary ?? null,
           url: a.url ?? null,
           publishedAt,
           externalId: a.externalId ?? null,
+          createdAt: now,
+          updatedAt: now,
         },
         { onConflict: "id" }
       );
