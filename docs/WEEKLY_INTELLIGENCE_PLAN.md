@@ -5,6 +5,16 @@
 
 ---
 
+## One-time setup: WeeklySummary table
+
+The build does **not** run `prisma db push` (so Vercel deploys succeed even when the DB isn’t reachable from build). Create the `WeeklySummary` table once:
+
+1. Copy **POSTGRES_PRISMA_URL** from Vercel (Project → Settings → Environment Variables) into a local `.env`.
+2. From the project root run: **`npm run db:push`**
+3. When it finishes, the table exists; `/weekly` and the Sunday cron will work.
+
+---
+
 ## Audience & intent
 
 - **Readers:** Finance, data science, scientists, software engineers; they invest in businesses, stocks, and crypto.
