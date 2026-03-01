@@ -2,6 +2,9 @@
 
 **Financial & political intelligence, simplified.** SignalDesk turns the day’s news into clear, actionable intelligence for shareholders, investors, and business leaders. Your feed refreshes daily (or on demand), and AI summarizes each story and spells out what it means for you—so you see the signal, not just the noise.
 
+- **Dashboard (Feed)** — Article-by-article intelligence with search and category filters.
+- **Weekly Brief** — A synthesized summary of the past week’s coverage: key trends, sector impact, and investor implications. Generated automatically each Sunday (or on demand via cron).
+
 **Live:** [signaldesk-chi.vercel.app](https://signaldesk-chi.vercel.app)
 
 *Product copy and taglines for non-technical users: [docs/PRODUCT_COPY.md](docs/PRODUCT_COPY.md)*
@@ -34,17 +37,21 @@ npm run dev
 | **NEWS_API_KEY** | For “Fetch news now” | [newsapi.org](https://newsapi.org) key. |
 | **GROQ_API_KEY** | For summaries | [console.groq.com](https://console.groq.com) — preferred (free tier). Or **OPENAI_API_KEY** for OpenAI. |
 | **DASHBOARD_PASSWORD** | Optional | If set, /dashboard requires login via /login. |
-| **CRON_SECRET** | Optional | Protects GET /api/cron/ingest-news. |
+| **CRON_SECRET** | Optional | Protects cron endpoints (ingest-news, prune-articles, generate-weekly-summary). |
 | **INGEST_API_KEY** | Optional | Protects POST /api/news/ingest. |
+| **POSTGRES_PRISMA_URL** | For Weekly Brief | Postgres connection string (e.g. Supabase). Required for the Weekly Summary feature and cron. |
+| **ARTICLE_RETENTION_DAYS** | Optional | Days to keep articles in the feed (default 30). Set to 0 to disable retention filter and prune. |
 
 For **local dev** without Supabase REST: add **SUPABASE_URL** and **SUPABASE_SERVICE_ROLE_KEY** to `.env` so the app uses the REST API instead of Prisma + pooler (avoids “Tenant or user not found”).
 
 ## Features
 
-- **Dashboard** — Intelligence feed: search, source filter, “Fetch news now”, article cards with AI summary and implications (shareholders / investors / business). Analyze button and auto-analyze on fetch when an API key is set.
+- **Dashboard (Feed)** — Intelligence feed: search, category filter by tag, “Fetch news now”, article cards with AI summary and implications (shareholders / investors / business). Analyze button and auto-analyze on fetch when an API key is set.
+- **Weekly Brief** — Route: `/weekly`. Shows up to four weekly summaries. Each brief is generated from the last 7 days of articles and includes a headline, key trends, geopolitical assessment, sector impact (with direction), and investor implications. When the week has little coverage on certain themes, the brief still summarizes what is in the feed. Cron: GET /api/cron/generate-weekly-summary (Sundays 18:00 UTC). Requires the `WeeklySummary` table; one-time SQL is in `prisma/scripts/create-weekly-summary-table.sql` (run in Supabase SQL Editor).
 - **News ingestion** — POST /api/news/ingest (body: `{ articles: [...] }`). Cron: GET /api/cron/ingest-news (pulls from News API).
 - **AI analysis** — POST /api/articles/[id]/analyze (Groq or OpenAI). Writes entities, topics, opportunities, implications, forShareholders, forInvestors, forBusiness.
 - **Feed store** — When BLOB_READ_WRITE_TOKEN is set, ingest writes the article list to Vercel Blob and the dashboard reads from it. See [docs/FEED_STORE_OPTIONS.md](docs/FEED_STORE_OPTIONS.md) for Blob vs KV.
+- **Article retention** — Articles older than 30 days (configurable via **ARTICLE_RETENTION_DAYS**) are excluded from the feed. Cron: GET /api/cron/prune-articles (daily) removes old rows from the database.
 
 ## Deploy (Vercel)
 
@@ -53,7 +60,8 @@ For **local dev** without Supabase REST: add **SUPABASE_URL** and **SUPABASE_SER
    - **SUPABASE_URL**, **SUPABASE_SERVICE_ROLE_KEY**
    - **BLOB_READ_WRITE_TOKEN** (create a Blob store in Vercel → Storage)
    - **NEWS_API_KEY**, **GROQ_API_KEY** (or OPENAI_API_KEY)
-3. Deploy. Optionally set **CRON_SECRET**, **DASHBOARD_PASSWORD**, **INGEST_API_KEY**.
+3. For **Weekly Brief**: ensure **POSTGRES_PRISMA_URL** is set, then run the SQL in `prisma/scripts/create-weekly-summary-table.sql` once in Supabase → SQL Editor to create the `WeeklySummary` table.
+4. Deploy. Optionally set **CRON_SECRET**, **DASHBOARD_PASSWORD**, **INGEST_API_KEY**, **ARTICLE_RETENTION_DAYS**.
 
 **Debug:** GET `/api/debug-db` shows which DB/feed store is in use. GET `/api/debug-articles` inspects raw Supabase article list response.
 
