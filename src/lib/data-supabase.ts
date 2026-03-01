@@ -45,20 +45,31 @@ export async function getSourcesSupabase(): Promise<SourceRow[]> {
 /** Try both PascalCase and lowercase table names; PostgREST/Postgres can expose either. */
 const ARTICLE_TABLE_ALT = ARTICLE_TABLE === "Article" ? "article" : ARTICLE_TABLE === "article" ? "Article" : null;
 
+/** Default retention: only show articles from the last N days. Set to 0 to disable. */
+const DEFAULT_RETENTION_DAYS = 30;
+
 export async function getArticlesSupabase(options: {
   limit: number;
   offset: number;
   sourceId?: string;
   category?: string;
   q?: string;
+  /** Only return articles with publishedAt on or after (now - retentionDays). Omit or 0 = no filter. */
+  retentionDays?: number;
 }): Promise<{ articles: (ArticleRow | CachedArticle)[]; total: number }> {
   const matchCategory = (a: { categories?: string[] }) =>
     !options.category || (Array.isArray(a.categories) && a.categories.includes(options.category!));
+  const retentionDays = options.retentionDays ?? DEFAULT_RETENTION_DAYS;
+  const publishedAfter =
+    retentionDays > 0
+      ? new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000).toISOString()
+      : null;
 
   if (hasBlobFeed()) {
     const blobFeed = await readFeedFromBlob();
     if (blobFeed && blobFeed.length > 0) {
       let list = blobFeed;
+      if (publishedAfter) list = list.filter((a) => !a.publishedAt || a.publishedAt >= publishedAfter);
       if (options.sourceId) list = list.filter((a) => a.sourceId === options.sourceId);
       if (options.category) {
         const idsWithCategory = await getArticleIdsByCategorySupabase(options.category);
@@ -92,6 +103,7 @@ export async function getArticlesSupabase(options: {
     const kvFeed = await readFeedFromKv();
     if (kvFeed && kvFeed.length > 0) {
       let list = kvFeed;
+      if (publishedAfter) list = list.filter((a) => !a.publishedAt || a.publishedAt >= publishedAfter);
       if (options.sourceId) list = list.filter((a) => a.sourceId === options.sourceId);
       if (options.category) {
         const idsWithCategory = await getArticleIdsByCategorySupabase(options.category);
@@ -129,6 +141,7 @@ export async function getArticlesSupabase(options: {
 
   async function run(table: string): Promise<{ data: unknown; count: number | null; error: unknown }> {
     let q = sb.from(table).select(cols, { count: "exact" }).order("publishedAt", { ascending: false }).limit(options.limit);
+    if (publishedAfter) q = q.gte("publishedAt", publishedAfter);
     if (options.sourceId) q = q.eq("sourceId", options.sourceId);
     if (options.category) q = q.contains("categories", [options.category]);
     if (options.q?.trim()) {

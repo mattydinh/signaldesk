@@ -31,12 +31,21 @@ type ArticleForList = {
   source: { name: string };
 };
 
-async function getArticlesForList(q: string | null): Promise<{ articles: ArticleForList[]; total: number }> {
+async function getArticlesForList(
+  q: string | null,
+  category: string | null
+): Promise<{ articles: ArticleForList[]; total: number }> {
+  const retentionDays =
+    typeof process.env.ARTICLE_RETENTION_DAYS !== "undefined"
+      ? parseInt(process.env.ARTICLE_RETENTION_DAYS, 10)
+      : 30;
   if (hasSupabaseDb()) {
     const { articles, total } = await getArticlesSupabase({
       limit: 50,
       offset: 0,
       q: q ?? undefined,
+      category: category ?? undefined,
+      retentionDays: Number.isNaN(retentionDays) ? 30 : retentionDays,
     });
     const sources = await getSourcesSupabase();
     const sourceMap = new Map(sources.map((s) => [s.id, s.name]));
@@ -50,6 +59,7 @@ async function getArticlesForList(q: string | null): Promise<{ articles: Article
   }
   const params = new URLSearchParams({ limit: "20" });
   if (q) params.set("q", q);
+  if (category) params.set("category", category);
   const res = await fetch(`${base}/api/articles?${params}`, { cache: "no-store" });
   if (!res.ok) throw new Error("Could not load articles");
   const data = (await res.json()) as { articles: ArticleForList[]; pagination: { total: number } };
@@ -58,15 +68,17 @@ async function getArticlesForList(q: string | null): Promise<{ articles: Article
 
 async function ArticlesList({
   q,
+  category,
   hasAnalyzeProvider,
 }: {
   q: string | null;
+  category: string | null;
   hasAnalyzeProvider: boolean;
 }) {
   let articles: ArticleForList[];
   let total: number;
   try {
-    const data = await getArticlesForList(q);
+    const data = await getArticlesForList(q, category);
     articles = data.articles;
     total = data.total;
   } catch {
@@ -222,10 +234,11 @@ async function ArticlesList({
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string }>;
+  searchParams: Promise<{ q?: string; category?: string }>;
 }) {
   const params = await searchParams;
   const q = params.q ?? null;
+  const category = params.category ?? null;
 
   return (
     <div className="min-h-screen gradient-mesh">
@@ -282,6 +295,7 @@ export default async function DashboardPage({
           >
             <ArticlesList
               q={q}
+              category={category}
               hasAnalyzeProvider={!!(process.env.GROQ_API_KEY || process.env.OPENAI_API_KEY)}
             />
           </Suspense>

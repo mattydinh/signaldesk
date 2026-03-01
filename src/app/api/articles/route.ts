@@ -20,6 +20,11 @@ export async function GET(request: NextRequest) {
     const q = searchParams.get("q")?.trim() ?? undefined;
     const offset = (page - 1) * limit;
 
+    const retentionDays =
+      typeof process.env.ARTICLE_RETENTION_DAYS !== "undefined"
+        ? parseInt(process.env.ARTICLE_RETENTION_DAYS, 10)
+        : 30;
+
     if (hasSupabaseDb()) {
       const { articles, total } = await getArticlesSupabase({
         limit,
@@ -27,6 +32,7 @@ export async function GET(request: NextRequest) {
         sourceId,
         category,
         q,
+        retentionDays: Number.isNaN(retentionDays) ? 30 : retentionDays,
       });
       const sources = await getSourcesSupabase();
       const sourceMap = new Map(sources.map((s) => [s.id, s]));
@@ -40,6 +46,11 @@ export async function GET(request: NextRequest) {
       });
     }
 
+    const publishedAfter =
+      retentionDays > 0 && !Number.isNaN(retentionDays)
+        ? new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000)
+        : null;
+
     let articleIds: string[] | null = null;
     if (q) {
       const tokens = q.replace(/\s+/g, " ").trim().slice(0, 200);
@@ -48,6 +59,7 @@ export async function GET(request: NextRequest) {
         SELECT id FROM "Article"
         WHERE to_tsvector('english', coalesce(title, '') || ' ' || coalesce(summary, '')) @@ plainto_tsquery('english', ${tokens})
         ${sourceId ? Prisma.sql`AND "sourceId" = ${sourceId}` : Prisma.empty}
+        ${publishedAfter ? Prisma.sql`AND "publishedAt" >= ${publishedAfter}` : Prisma.empty}
         ORDER BY "publishedAt" DESC NULLS LAST
       `;
         articleIds = rows.map((r) => r.id);
@@ -57,6 +69,8 @@ export async function GET(request: NextRequest) {
     type Where = {
       sourceId?: string;
       id?: { in: string[] };
+      categories?: { has: string };
+      publishedAt?: { gte: Date };
       OR?: Array<{ title?: { contains: string; mode: "insensitive" }; summary?: { contains: string; mode: "insensitive" } }>;
     };
     const where: Where = {};
@@ -74,7 +88,9 @@ export async function GET(request: NextRequest) {
       idsToFetch = articleIds.slice(offset, offset + limit);
       where.id = { in: idsToFetch };
     } else {
+      if (publishedAfter) where.publishedAt = { gte: publishedAfter };
       if (sourceId) where.sourceId = sourceId;
+      if (category) where.categories = { has: category };
       if (q) {
         where.OR = [
           { title: { contains: q, mode: "insensitive" } },

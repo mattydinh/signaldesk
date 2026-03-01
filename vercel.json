@@ -1,8 +1,6 @@
 {
   "crons": [
-    {
-      "path": "/api/cron/ingest-news",
-      "schedule": "0 9 * * *"
-    }
+    { "path": "/api/cron/ingest-news", "schedule": "0 9 * * *" },
+    { "path": "/api/cron/prune-articles", "schedule": "0 4 * * *" }
   ]
 }
