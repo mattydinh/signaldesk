@@ -21,14 +21,12 @@ function escalationLabel(score: number | null): string {
 
 export default async function WeeklyPage() {
   let summaries: Awaited<ReturnType<typeof prisma.weeklySummary.findMany>> = [];
-  let tableExists = true;
   try {
     summaries = await prisma.weeklySummary.findMany({
       orderBy: { weekStart: "desc" },
       take: 4,
     });
   } catch (e) {
-    tableExists = false;
     console.error("[weekly] fetch error", e);
   }
 
@@ -96,13 +94,6 @@ export default async function WeeklyPage() {
               />
             </div>
             <p>No briefs yet. The first one will appear after the weekly job runs (Sundays at 6 PM UTC).</p>
-            {!tableExists && (
-              <p className="rounded-card border border-border/60 bg-muted/20 p-4 text-caption">
-                <strong className="text-foreground">One-time setup:</strong> Run the SQL in{" "}
-                <code className="rounded bg-muted px-1">prisma/scripts/create-weekly-summary-table.sql</code> in Supabase
-                → SQL Editor so the Weekly Summary table exists.
-              </p>
-            )}
           </div>
         ) : (
           <ul className="mt-10 space-y-6" role="list" aria-label="Weekly briefs">
