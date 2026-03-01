@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { prisma } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
@@ -20,13 +21,14 @@ function escalationLabel(score: number | null): string {
 
 export default async function WeeklyPage() {
   let summaries: Awaited<ReturnType<typeof prisma.weeklySummary.findMany>> = [];
+  let tableExists = true;
   try {
     summaries = await prisma.weeklySummary.findMany({
       orderBy: { weekStart: "desc" },
       take: 4,
     });
   } catch (e) {
-    // Table may not exist yet (run prisma/scripts/create-weekly-summary-table.sql in Supabase)
+    tableExists = false;
     console.error("[weekly] fetch error", e);
   }
 
@@ -83,13 +85,24 @@ export default async function WeeklyPage() {
         </section>
 
         {summaries.length === 0 ? (
-          <div className="mt-10 space-y-4 text-body-sm text-muted-foreground">
+          <div className="mt-10 space-y-6 text-body-sm text-muted-foreground">
+            <div className="flex justify-center">
+              <Image
+                src="/weekly-empty-placeholder.png"
+                alt=""
+                width={400}
+                height={300}
+                className="rounded-card object-cover"
+              />
+            </div>
             <p>No briefs yet. The first one will appear after the weekly job runs (Sundays at 6 PM UTC).</p>
-            <p className="rounded-card border border-border/60 bg-muted/20 p-4 text-caption">
-              <strong className="text-foreground">One-time setup:</strong> If this is your first time, run the SQL in{" "}
-              <code className="rounded bg-muted px-1">prisma/scripts/create-weekly-summary-table.sql</code> in Supabase
-              → SQL Editor so the Weekly Summary table exists.
-            </p>
+            {!tableExists && (
+              <p className="rounded-card border border-border/60 bg-muted/20 p-4 text-caption">
+                <strong className="text-foreground">One-time setup:</strong> Run the SQL in{" "}
+                <code className="rounded bg-muted px-1">prisma/scripts/create-weekly-summary-table.sql</code> in Supabase
+                → SQL Editor so the Weekly Summary table exists.
+              </p>
+            )}
           </div>
         ) : (
           <ul className="mt-10 space-y-6" role="list" aria-label="Weekly briefs">
