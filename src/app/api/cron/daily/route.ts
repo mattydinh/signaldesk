@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { runPipelinePart1 } from "@/lib/pipeline/run";
+import { fetchAndIngestNews } from "@/lib/fetch-news";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
+export const maxDuration = 120;
 
 function auth(request: NextRequest): boolean {
   const secret = process.env.CRON_SECRET?.trim();
@@ -27,12 +28,10 @@ async function callInternalCron(origin: string, path: string): Promise<unknown> 
 
 /**
  * GET /api/cron/daily
- * Reliability backstop (runs once per day):
+ * Runs once per day via Vercel cron:
+ * - News ingest (RSS feeds → Supabase)
  * - Pipeline part 1 (events → features → signals; keeps Intelligence fresh)
  * - Prune old articles (storage/retention)
- *
- * Note: News ingest runs from GitHub Action (POST /api/news/ingest), not from Vercel cron
- * because News API free tier often blocks production/Vercel requests.
  */
 export async function GET(request: NextRequest) {
   if (!auth(request)) {
@@ -43,6 +42,13 @@ export async function GET(request: NextRequest) {
   const startedAt = new Date().toISOString();
 
   const out: Record<string, unknown> = { ok: true, startedAt };
+
+  try {
+    out.ingest = await fetchAndIngestNews();
+  } catch (e) {
+    console.error("[cron/daily] ingest failed", e);
+    out.ingestError = e instanceof Error ? e.message : String(e);
+  }
 
   try {
     out.pipelinePart1 = await runPipelinePart1();

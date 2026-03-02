@@ -8,9 +8,9 @@ export type RssFeedConfig = {
 const defaultFeeds: RssFeedConfig[] = [
   // Markets / Finance
   {
-    url: "https://feeds.reuters.com/reuters/businessNews",
-    sourceName: "Reuters Business",
-    sourceBaseUrl: "https://www.reuters.com",
+    url: "https://feeds.npr.org/1006/rss.xml",
+    sourceName: "NPR Business",
+    sourceBaseUrl: "https://www.npr.org",
   },
   {
     url: "https://reutersbest.com/feed/",
@@ -55,9 +55,9 @@ const defaultFeeds: RssFeedConfig[] = [
     sourceBaseUrl: "https://apnews.com",
   },
   {
-    url: "https://feeds.reuters.com/Reuters/worldNews",
-    sourceName: "Reuters World",
-    sourceBaseUrl: "https://www.reuters.com",
+    url: "https://feeds.npr.org/1004/rss.xml",
+    sourceName: "NPR World",
+    sourceBaseUrl: "https://www.npr.org",
   },
   {
     url: "http://feeds.bbci.co.uk/news/world/rss.xml",
@@ -67,9 +67,9 @@ const defaultFeeds: RssFeedConfig[] = [
 
   // Energy / Oil
   {
-    url: "https://feeds.reuters.com/reuters/energy",
-    sourceName: "Reuters Energy",
-    sourceBaseUrl: "https://www.reuters.com",
+    url: "https://www.eia.gov/rss/news.xml",
+    sourceName: "EIA Energy News",
+    sourceBaseUrl: "https://www.eia.gov",
   },
   {
     url: "https://oilprice.com/rss/main",
@@ -84,9 +84,9 @@ const defaultFeeds: RssFeedConfig[] = [
     sourceBaseUrl: "https://www.fda.gov",
   },
   {
-    url: "https://feeds.reuters.com/reuters/healthNews",
-    sourceName: "Reuters Health",
-    sourceBaseUrl: "https://www.reuters.com",
+    url: "https://feeds.npr.org/1128/rss.xml",
+    sourceName: "NPR Health",
+    sourceBaseUrl: "https://www.npr.org",
   },
 
   // Tech
