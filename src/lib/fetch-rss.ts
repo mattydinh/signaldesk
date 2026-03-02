@@ -111,7 +111,7 @@ function getSummary(item: any): string | undefined {
 
 export async function fetchRssFeed(feed: RssFeedConfig): Promise<IngestArticle[]> {
   try {
-    const res = await fetch(feed.url, { cache: "no-store" });
+    const res = await fetch(feed.url, { cache: "no-store", signal: AbortSignal.timeout(5000) });
     if (!res.ok) {
       console.error("[fetch-rss] feed failed", feed.url, res.status);
       return [];
@@ -173,11 +173,12 @@ export async function fetchRssFeed(feed: RssFeedConfig): Promise<IngestArticle[]
 
 export async function fetchAllRssArticles(): Promise<IngestArticle[]> {
   const feeds = getRssFeeds();
-  const all: IngestArticle[] = [];
 
-  for (const feed of feeds) {
-    const items = await fetchRssFeed(feed);
-    all.push(...items);
+  // Fetch all feeds in parallel — sequential fetching with no timeout was causing 60s+ hangs
+  const results = await Promise.allSettled(feeds.map((feed) => fetchRssFeed(feed)));
+  const all: IngestArticle[] = [];
+  for (const result of results) {
+    if (result.status === "fulfilled") all.push(...result.value);
   }
 
   // URL-first dedupe across all feeds.

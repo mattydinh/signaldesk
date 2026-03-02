@@ -307,6 +307,7 @@ export async function ingestArticlesSupabase(
   let skipped = 0;
   const newArticleIds: string[] = [];
   const feedEntries: CachedArticle[] = [];
+  const sourceIdCache = new Map<string, string>(); // slug → sourceId, avoid repeat lookups
 
   for (const a of articles) {
     if (!a.title || !a.sourceName) {
@@ -316,43 +317,48 @@ export async function ingestArticlesSupabase(
 
     const slug = a.sourceSlug ?? slugify(a.sourceName);
 
-    let existingSourceRes = await sb.from(SOURCE_TABLE).select("id").eq("slug", slug).maybeSingle();
-    let existingSource = (existingSourceRes as { data?: unknown }).data;
-    if (!existingSource && SOURCE_TABLE_ALT) {
-      existingSourceRes = await sb.from(SOURCE_TABLE_ALT).select("id").eq("slug", slug).maybeSingle();
-      existingSource = (existingSourceRes as { data?: unknown }).data;
-    }
-    if (!existingSource && SOURCE_TABLE !== "sources") {
-      existingSourceRes = await sb.from("sources").select("id").eq("slug", slug).maybeSingle();
-      existingSource = (existingSourceRes as { data?: unknown }).data;
-    }
-
-    const existingId = (existingSource as { id?: string } | null)?.id;
     let sourceId: string;
-    if (existingId) {
-      sourceId = existingId;
+    if (sourceIdCache.has(slug)) {
+      sourceId = sourceIdCache.get(slug)!;
     } else {
-      const sourcePayload = { name: a.sourceName, slug, baseUrl: a.sourceBaseUrl ?? null };
-      let insertSourceRes = await sb.from(SOURCE_TABLE).insert(sourcePayload).select("id").single();
-      let newSource = (insertSourceRes as { data?: unknown }).data;
-      let insertSourceErr = (insertSourceRes as { error?: unknown }).error;
-      const firstSourceErr = (insertSourceErr as { message?: string })?.message;
-      if (insertSourceErr && SOURCE_TABLE_ALT) {
-        insertSourceRes = await sb.from(SOURCE_TABLE_ALT).insert(sourcePayload).select("id").single();
-        newSource = (insertSourceRes as { data?: unknown }).data;
-        insertSourceErr = (insertSourceRes as { error?: unknown }).error;
+      let existingSourceRes = await sb.from(SOURCE_TABLE).select("id").eq("slug", slug).maybeSingle();
+      let existingSource = (existingSourceRes as { data?: unknown }).data;
+      if (!existingSource && SOURCE_TABLE_ALT) {
+        existingSourceRes = await sb.from(SOURCE_TABLE_ALT).select("id").eq("slug", slug).maybeSingle();
+        existingSource = (existingSourceRes as { data?: unknown }).data;
       }
-      if (insertSourceErr && SOURCE_TABLE !== "sources") {
-        insertSourceRes = await sb.from("sources").insert(sourcePayload).select("id").single();
-        newSource = (insertSourceRes as { data?: unknown }).data;
-        insertSourceErr = (insertSourceRes as { error?: unknown }).error;
+      if (!existingSource && SOURCE_TABLE !== "sources") {
+        existingSourceRes = await sb.from("sources").select("id").eq("slug", slug).maybeSingle();
+        existingSource = (existingSourceRes as { data?: unknown }).data;
       }
-      if (insertSourceErr || !(newSource as { id?: string })?.id) {
-        console.error("[data-supabase] insert source failed | first:", firstSourceErr, "| last:", (insertSourceErr as { message?: string })?.message);
-        skipped++;
-        continue;
+
+      const existingId = (existingSource as { id?: string } | null)?.id;
+      if (existingId) {
+        sourceId = existingId;
+      } else {
+        const sourcePayload = { name: a.sourceName, slug, baseUrl: a.sourceBaseUrl ?? null };
+        let insertSourceRes = await sb.from(SOURCE_TABLE).insert(sourcePayload).select("id").single();
+        let newSource = (insertSourceRes as { data?: unknown }).data;
+        let insertSourceErr = (insertSourceRes as { error?: unknown }).error;
+        const firstSourceErr = (insertSourceErr as { message?: string })?.message;
+        if (insertSourceErr && SOURCE_TABLE_ALT) {
+          insertSourceRes = await sb.from(SOURCE_TABLE_ALT).insert(sourcePayload).select("id").single();
+          newSource = (insertSourceRes as { data?: unknown }).data;
+          insertSourceErr = (insertSourceRes as { error?: unknown }).error;
+        }
+        if (insertSourceErr && SOURCE_TABLE !== "sources") {
+          insertSourceRes = await sb.from("sources").insert(sourcePayload).select("id").single();
+          newSource = (insertSourceRes as { data?: unknown }).data;
+          insertSourceErr = (insertSourceRes as { error?: unknown }).error;
+        }
+        if (insertSourceErr || !(newSource as { id?: string })?.id) {
+          console.error("[data-supabase] insert source failed | first:", firstSourceErr, "| last:", (insertSourceErr as { message?: string })?.message);
+          skipped++;
+          continue;
+        }
+        sourceId = (newSource as { id: string }).id;
       }
-      sourceId = (newSource as { id: string }).id;
+      sourceIdCache.set(slug, sourceId);
     }
 
     if (a.externalId) {
