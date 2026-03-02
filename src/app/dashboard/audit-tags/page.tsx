@@ -11,7 +11,7 @@ import { prisma } from "@/lib/db";
 export const dynamic = "force-dynamic";
 
 async function getRecentArticlesWithCategories(): Promise<
-  { id: string; title: string | null; publishedAt: Date | null; categories: string[]; sourceName?: string }[]
+  { id: string; title: string | null; publishedAt: Date | string | null; categories: string[]; sourceName?: string }[]
 > {
   const retentionDays =
     typeof process.env.ARTICLE_RETENTION_DAYS !== "undefined"
@@ -27,7 +27,7 @@ async function getRecentArticlesWithCategories(): Promise<
       offset: 0,
       retentionDays: days,
     });
-    return articles as { id: string; title: string | null; publishedAt: string | null; categories: string[]; sourceName?: string }[];
+    return articles as { id: string; title: string | null; publishedAt: Date | string | null; categories: string[]; sourceName?: string }[];
   }
   const rows = await prisma.article.findMany({
     where: { publishedAt: { gte: since } },

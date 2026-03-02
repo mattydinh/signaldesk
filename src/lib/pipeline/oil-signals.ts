@@ -113,9 +113,9 @@ async function runOilComposite(daysBack: number): Promise<number> {
 
   const allDates = Array.from(
     new Set([
-      ...momentumByDate.keys(),
-      ...sentimentByDate.keys(),
-      ...volumeByDate.keys(),
+      ...Array.from(momentumByDate.keys()),
+      ...Array.from(sentimentByDate.keys()),
+      ...Array.from(volumeByDate.keys()),
     ])
   ).sort();
 
