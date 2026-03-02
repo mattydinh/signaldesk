@@ -441,23 +441,46 @@ export default async function IntelligencePage() {
           </div>
         </section>
 
-        {/* Core Signals: topic signals + sector composites */}
+        {/* Core Signals: topic signals (sentiment + volume separate) + sector composites */}
         <section className="mb-16" aria-label="Core signals">
           <div className="glass-card rounded-card border border-[#27272A] p-8">
             <h2 className="text-section-header text-foreground mb-4">Core Signals</h2>
-            <p className="text-meta text-[#71717A] mb-4">
-              Topic-level signals (sentiment and volume by category) and sector composites (Oil & Gas, Pharma). Pick a topic signal to see z-score over time; select a sector for gauge, components, chart, and backtest. <strong className="text-[#A1A1AA]">z &gt; 1</strong> = unusually high vs last 60 days; <strong className="text-[#A1A1AA]">z &lt; -1</strong> = unusually low.
+            <p className="text-meta text-[#71717A] mb-6">
+              Topic-level signals and sector composites (Oil & Gas, Pharma). Sentiment = tone of coverage vs 60-day average; volume = amount of coverage vs 60-day average. <strong className="text-[#A1A1AA]">z &gt; 1</strong> = unusually high; <strong className="text-[#A1A1AA]">z &lt; -1</strong> = unusually low.
             </p>
             {signals.length > 0 ? (
-              <SignalChart
-                signals={signals.map((s) => ({
-                  date: s.date.toISOString().slice(0, 10),
-                  signalName: s.signalName,
-                  zscore: s.zscore,
-                }))}
-              />
+              <>
+                <div className="mb-10">
+                  <h3 className="text-body font-medium text-foreground mb-1">Topic sentiment</h3>
+                  <p className="text-meta text-[#71717A] mb-3">
+                    Sentiment z-score vs 60-day average (tone of coverage).
+                  </p>
+                  <SignalChart
+                    mode="sentiment"
+                    signals={signals.map((s) => ({
+                      date: s.date.toISOString().slice(0, 10),
+                      signalName: s.signalName,
+                      zscore: s.zscore,
+                    }))}
+                  />
+                </div>
+                <div className="mb-10">
+                  <h3 className="text-body font-medium text-foreground mb-1">Topic volume</h3>
+                  <p className="text-meta text-[#71717A] mb-3">
+                    Volume z-score vs 60-day average (amount of coverage).
+                  </p>
+                  <SignalChart
+                    mode="volume"
+                    signals={signals.map((s) => ({
+                      date: s.date.toISOString().slice(0, 10),
+                      signalName: s.signalName,
+                      zscore: s.zscore,
+                    }))}
+                  />
+                </div>
+              </>
             ) : (
-              <p className="text-body text-[#71717A]">
+              <p className="text-body text-[#71717A] mb-6">
                 No derived signals yet. Signals come from ingested articles (events). Use Dashboard → Fetch news, then run the pipeline.
               </p>
             )}

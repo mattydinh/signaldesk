@@ -34,7 +34,13 @@ const SIGNAL_COLORS: Record<string, string> = {
   HealthcareVolume: "#67e8f9",
 };
 
-export default function SignalChart({ signals }: { signals: SignalPoint[] }) {
+type SignalChartProps = {
+  signals: SignalPoint[];
+  /** When set, show only one dropdown for that type (Option B: separate sentiment vs volume charts). When unset, show one dropdown for all signals (e.g. sector composite). */
+  mode?: "sentiment" | "volume";
+};
+
+export default function SignalChart({ signals, mode }: SignalChartProps) {
   const byName = useMemo(() => {
     const m = new Map<string, SignalPoint[]>();
     for (const s of signals) {
@@ -55,26 +61,24 @@ export default function SignalChart({ signals }: { signals: SignalPoint[] }) {
     [byName]
   );
 
-  const [sentimentSelected, setSentimentSelected] = useState(sentimentOptions[0] ?? "");
-  const [volumeSelected, setVolumeSelected] = useState(volumeOptions[0] ?? "");
-  const [chartSource, setChartSource] = useState<"sentiment" | "volume">(
-    sentimentOptions.length > 0 ? "sentiment" : "volume"
-  );
+  const options = useMemo(() => {
+    if (mode === "sentiment") return sentimentOptions;
+    if (mode === "volume") return volumeOptions;
+    const all = [...new Set([...sentimentOptions, ...volumeOptions])];
+    if (all.length > 0) return all;
+    return Array.from(byName.keys()).sort();
+  }, [mode, sentimentOptions, volumeOptions, byName]);
+
+  const [selected, setSelected] = useState(options[0] ?? "");
 
   useEffect(() => {
-    if (sentimentOptions.length && !sentimentOptions.includes(sentimentSelected)) setSentimentSelected(sentimentOptions[0]);
-    if (volumeOptions.length && !volumeOptions.includes(volumeSelected)) setVolumeSelected(volumeOptions[0]);
-  }, [sentimentOptions, volumeOptions, sentimentSelected, volumeSelected]);
+    if (options.length && !options.includes(selected)) setSelected(options[0]);
+  }, [options, selected]);
 
   const chartSignal = useMemo(() => {
-    const fromSentiment = chartSource === "sentiment" && sentimentSelected && byName.has(sentimentSelected);
-    const fromVolume = chartSource === "volume" && volumeSelected && byName.has(volumeSelected);
-    if (fromSentiment) return sentimentSelected;
-    if (fromVolume) return volumeSelected;
-    if (sentimentSelected && byName.has(sentimentSelected)) return sentimentSelected;
-    if (volumeSelected && byName.has(volumeSelected)) return volumeSelected;
-    return "";
-  }, [chartSource, sentimentSelected, volumeSelected, byName]);
+    if (selected && byName.has(selected)) return selected;
+    return options[0] ?? "";
+  }, [selected, byName, options]);
 
   const chartData = useMemo(() => {
     if (!chartSignal) return [];
@@ -83,53 +87,37 @@ export default function SignalChart({ signals }: { signals: SignalPoint[] }) {
   }, [byName, chartSignal]);
 
   if (signals.length === 0) return null;
+  if (mode && options.length === 0) return null;
+
+  const selectId = mode ? `signal-select-${mode}` : "signal-select-all";
+  const label = "Signal";
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-4">
         <div className="flex items-center gap-2">
-          <label htmlFor="sentiment-select" className="text-body text-[#A1A1AA]">
-            Sentiment
+          <label htmlFor={selectId} className="text-body text-[#A1A1AA]">
+            {label}
           </label>
           <select
-            id="sentiment-select"
-            value={sentimentSelected}
-            onChange={(e) => {
-              setSentimentSelected(e.target.value);
-              setChartSource("sentiment");
-            }}
+            id={selectId}
+            value={selected}
+            onChange={(e) => setSelected(e.target.value)}
             className="rounded-badge border border-[#27272A] bg-[#18181B] px-3 py-2 text-body text-foreground focus:ring-2 focus:ring-ring"
+            aria-describedby={chartSignal ? `${selectId}-desc` : undefined}
           >
-            {sentimentOptions.map((name) => (
+            {options.map((name) => (
               <option key={name} value={name}>
                 {name}
               </option>
             ))}
           </select>
         </div>
-        <div className="flex items-center gap-2">
-          <label htmlFor="volume-select" className="text-body text-[#A1A1AA]">
-            Volume
-          </label>
-          <select
-            id="volume-select"
-            value={volumeSelected}
-            onChange={(e) => {
-              setVolumeSelected(e.target.value);
-              setChartSource("volume");
-            }}
-            className="rounded-badge border border-[#27272A] bg-[#18181B] px-3 py-2 text-body text-foreground focus:ring-2 focus:ring-ring"
-          >
-            {volumeOptions.map((name) => (
-              <option key={name} value={name}>
-                {name}
-              </option>
-            ))}
-          </select>
-        </div>
-        <span className="text-meta text-[#71717A]">
-          Chart shows: <strong className="text-foreground">{chartSignal || "—"}</strong>
-        </span>
+        {chartSignal ? (
+          <span id={`${selectId}-desc`} className="text-meta text-[#71717A]">
+            Showing: <strong className="text-foreground">{chartSignal}</strong>
+          </span>
+        ) : null}
       </div>
       <div className="h-[320px] w-full">
         <ResponsiveContainer width="100%" height="100%">
