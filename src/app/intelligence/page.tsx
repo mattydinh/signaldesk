@@ -1,9 +1,12 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 import SignalChart from "./SignalChart";
+import PopulateButton from "./PopulateButton";
+import { runPipeline } from "@/lib/pipeline/run";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
+export const maxDuration = 90;
 
 async function getLatestRegime() {
   try {
@@ -50,13 +53,31 @@ function regimeBadgeClass(regime: string): string {
 }
 
 export default async function IntelligencePage() {
-  const [regime, signals, backtestResults] = await Promise.all([
+  let [regime, signals, backtestResults] = await Promise.all([
     getLatestRegime(),
     getRecentSignals(),
     getLatestBacktestResults(),
   ]);
 
   const hasData = regime != null || signals.length > 0 || backtestResults.length > 0;
+
+  let pipelineError: string | null = null;
+  // If no Intelligence data, run the pipeline once so the page can show results (e.g. after first deploy)
+  if (!hasData) {
+    try {
+      await runPipeline();
+      [regime, signals, backtestResults] = await Promise.all([
+        getLatestRegime(),
+        getRecentSignals(),
+        getLatestBacktestResults(),
+      ]);
+    } catch (e) {
+      console.error("[intelligence] pipeline run failed", e);
+      pipelineError = e instanceof Error ? e.message : "Pipeline run failed (e.g. timeout)";
+    }
+  }
+
+  const hasDataNow = regime != null || signals.length > 0 || backtestResults.length > 0;
 
   return (
     <div className="min-h-screen gradient-mesh">
@@ -144,7 +165,7 @@ export default async function IntelligencePage() {
               </div>
             ) : (
               <p className="text-body text-[#71717A]">
-                No regime data yet. Run the signals pipeline and regime job to populate.
+                No regime data yet. Run the pipeline (button below) or fetch news first so events exist.
               </p>
             )}
           </div>
@@ -164,7 +185,7 @@ export default async function IntelligencePage() {
               />
             ) : (
               <p className="text-body text-[#71717A]">
-                No derived signals yet. Run the pipeline (GET /api/cron/run-pipeline) to populate.
+                No derived signals yet. Signals come from ingested articles (events). Use Dashboard → Fetch news, then run the pipeline.
               </p>
             )}
           </div>
@@ -190,10 +211,18 @@ export default async function IntelligencePage() {
           </div>
         </section>
 
-        {!hasData && (
-          <p className="text-body text-[#71717A]">
-            The ML pipeline is initializing. Once events, topic metrics, and signals are computed, this page will show regime, charts, and performance.
-          </p>
+        {!hasDataNow && (
+          <div className="space-y-4 rounded-card border border-[#27272A] bg-[#18181B]/60 p-6">
+            <p className="text-body text-[#A1A1AA]">
+              Intelligence data comes from the ML pipeline (events → signals → regime → backtest). That pipeline runs automatically after you <Link href="/dashboard" className="text-[#FAFAFA] underline">fetch news</Link> or on a schedule; the first run can take up to a minute and may timeout on Vercel.
+            </p>
+            {pipelineError && (
+              <p className="text-body text-[#F87171]">
+                First-load run failed: {pipelineError}. Use the button below or run the pipeline from your dashboard / cron.
+              </p>
+            )}
+            <PopulateButton />
+          </div>
         )}
       </main>
     </div>

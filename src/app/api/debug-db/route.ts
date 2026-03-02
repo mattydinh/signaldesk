@@ -28,6 +28,10 @@ export async function GET() {
   const feedBlob = !!(process.env.BLOB_READ_WRITE_TOKEN);
   const feedKv = !!(process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN);
 
+  const startsWithPostgres = url.startsWith("postgresql://") || url.startsWith("postgres://");
+  const expectedHost = "aws-0-us-west-2.pooler.supabase.com";
+  const hasExpectedHost = url.includes(expectedHost);
+
   return NextResponse.json({
     ok: true,
     hasUrl: true,
@@ -38,6 +42,11 @@ export async function GET() {
     usingDirect: isDirect,
     region: region ?? (isPooler ? "could not parse" : null),
     feedStore: { blob: feedBlob, kv: feedKv },
+    urlCheck: {
+      startsWithPostgres,
+      hasExpectedHost,
+      urlLength: url.length,
+    },
     hint: !usingSupabaseApi && hasSupabaseUrl
       ? "Supabase REST API is OFF: SUPABASE_SERVICE_ROLE_KEY is not set. Add it in Vercel (Supabase Dashboard → Settings → API → service_role secret) and redeploy."
       : !usingSupabaseApi && hasServiceRoleKey

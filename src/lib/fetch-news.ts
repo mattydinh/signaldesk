@@ -64,6 +64,10 @@ export async function fetchAndIngestNews(): Promise<FetchNewsResult> {
 
   try {
     const result = await ingestArticles(allArticles);
+    // Run ML pipeline in background to populate Intelligence (best-effort; don't block response)
+    import("@/lib/pipeline/run").then(({ runPipeline }) =>
+      runPipeline().catch((err) => console.error("[fetch-news] pipeline", err))
+    );
     return { ok: true, ...result, newArticleIds: result.newArticleIds ?? [] };
   } catch (e) {
     const message = e instanceof Error ? e.message : "Database ingest failed.";

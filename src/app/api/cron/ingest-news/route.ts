@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { fetchAndIngestNews } from "@/lib/fetch-news";
 import { hasSupabaseDb } from "@/lib/supabase-server";
 import { getArticlesSupabase } from "@/lib/data-supabase";
+import { runPipeline } from "@/lib/pipeline/run";
 
 const ANALYZE_BATCH = 3;
 const ANALYZE_DELAY_MS = 400;
@@ -21,10 +22,12 @@ async function runAnalyzeBatch(ids: string[], origin: string): Promise<void> {
   }
 }
 
+export const maxDuration = 120;
+
 /**
  * GET /api/cron/ingest-news
  * Fetches business + general headlines from News API, ingests them, and auto-tags new articles.
- * Also backfills tags for up to BACKFILL_BATCH existing articles that have no categories.
+ * Also runs the ML pipeline to populate Intelligence (signals, regime, backtest).
  * Set GROQ_API_KEY or OPENAI_API_KEY to auto-tag. CRON_SECRET required.
  */
 export async function GET(request: NextRequest) {
@@ -65,6 +68,14 @@ export async function GET(request: NextRequest) {
         await runAnalyzeBatch(needTags, origin);
       }
     }
+  }
+
+  // Populate Intelligence: run ML pipeline after ingest (events → signals → regime → backtest)
+  try {
+    await runPipeline();
+  } catch (e) {
+    console.error("[ingest-news] pipeline run failed", e);
+    // Don't fail the cron; ingest succeeded
   }
 
   return NextResponse.json(result);

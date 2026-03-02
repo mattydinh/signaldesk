@@ -73,6 +73,8 @@ If **CRON_SECRET** is set, the request must include it. Optionally add a Vercel 
 
 **Debug:** GET `/api/debug-db` shows which DB/feed store is in use. GET `/api/debug-articles` inspects raw Supabase article list response.
 
+**Intelligence page blank or pipeline all zeros?** See [docs/RUNBOOK_INTELLIGENCE_AND_INGEST.md](docs/RUNBOOK_INTELLIGENCE_AND_INGEST.md) for causes and fixes (backfill-events + run-pipeline).
+
 **Backfill Blob → Supabase:** If the dashboard shows many articles (from Blob) but your Supabase `Article` table has only a few rows, run the one-time backfill so all feed items exist in Supabase:
 
 ```bash
