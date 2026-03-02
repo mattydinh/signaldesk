@@ -74,28 +74,32 @@ flowchart LR
 
 ---
 
-### Phase 2 — After sprint (when data/bandwidth allows)
+### Phase 2 — Done
+
+**Shipped:** EIA + rig storage, fetch-fundamentals cron (Wed 14:00 UTC), 5-component oil composite, Oil UI with Inventory/Rig.
 
 | # | Task | Owner | Notes |
 |---|------|--------|--------|
-| 1 | **Storage for EIA + rig** | Dev | Table(s) for weekly EIA inventory and Baker Hughes rig count; forward-fill to daily for pipeline. |
-| 2 | **EIA + rig cron** | Dev | Cron job to fetch EIA and Baker Hughes; persist and forward-fill. |
-| 3 | **Rig count signal** | Dev | RigTrend (or similar) from rig count; add to oil-signals. |
-| 4 | **Extend oil composite to 5 components** | Dev | Add InventoryShock, RigTrend to composite in [oil-signals.ts](src/lib/pipeline/oil-signals.ts); write to derived_signals. |
-| 5 | **Oil UI: Inventory/Rig** | Dev | Show InventoryShock and RigTrend in Oil & Gas component table; optional OilStressSignal / Energy Shock Risk on Intelligence. |
+| 1 | **Storage for EIA + rig** | Dev | ✅ WeeklyFundamental table; [weekly-fundamentals.ts](src/lib/pipeline/weekly-fundamentals.ts). |
+| 2 | **EIA + rig cron** | Dev | ✅ GET /api/cron/fetch-fundamentals; Vercel cron Wed 14:00 UTC. |
+| 3 | **Rig count signal** | Dev | ✅ RigTrend in [oil-signals.ts](src/lib/pipeline/oil-signals.ts). |
+| 4 | **Extend oil composite to 5 components** | Dev | ✅ InventoryShock, RigTrend in composite. |
+| 5 | **Oil UI: Inventory/Rig** | Dev | ✅ Intelligence Oil & Gas shows all 5 components. |
 
 ---
 
-### Phase 3 — Pharma & data quality
+### Phase 3 — Done
+
+**Shipped:** Healthcare signals, XLV, pharma-signals module, pipeline wiring, News API sector queries, Intelligence Pharma section.
 
 | # | Task | Owner | Notes |
 |---|------|--------|--------|
-| 1 | **Healthcare signals in derived_signals** | Dev | Add HealthcareSentiment, HealthcareVolume (or PharmaNewsVolume) to SIGNAL_DEFS in [derived-signals.ts](src/lib/pipeline/derived-signals.ts) if not present. |
-| 2 | **XLV in market prices** | Dev | Add XLV to [market-prices.ts](src/lib/pipeline/market-prices.ts); run pipeline. |
-| 3 | **Pharma-signals module** | Dev | New pharma-signals step (or extend oil-signals pattern): XLV momentum, weighted composite with HealthcareSentiment + HealthcareVolume; backtest vs XLV/SPY. |
-| 4 | **Pipeline wiring** | Dev | In [run.ts](src/lib/pipeline/run.ts): run pharma-signals step; persist backtests. |
-| 5 | **News API sector queries** | Dev | Add sector "everything" queries (e.g. FDA, drug approval; oil, OPEC) so ingest gets more sector-specific articles. |
-| 6 | **Intelligence: Pharma section** | Dev | Gauge, component table, chart, backtest panel for pharma composite (mirror Oil & Gas). |
+| 1 | **Healthcare signals in derived_signals** | Dev | ✅ HealthcareSentiment, HealthcareVolume in [derived-signals.ts](src/lib/pipeline/derived-signals.ts). |
+| 2 | **XLV in market prices** | Dev | ✅ XLV in [market-prices.ts](src/lib/pipeline/market-prices.ts). |
+| 3 | **Pharma-signals module** | Dev | ✅ [pharma-signals.ts](src/lib/pipeline/pharma-signals.ts): PharmaPriceMomentum, PharmaCompositeSignal. |
+| 4 | **Pipeline wiring** | Dev | ✅ runPharmaSignals in part 1; backtest vs XLV/SPY in part 2. |
+| 5 | **News API sector queries** | Dev | ✅ [fetch-news.ts](src/lib/fetch-news.ts): pharma + energy sector queries. |
+| 6 | **Intelligence: Pharma section** | Dev | ✅ Pharma gauge, component table, chart, backtest. |
 
 ---
 
@@ -105,11 +109,35 @@ flowchart LR
 
 ---
 
+### Next (sprint continuation)
+
+| # | Task | Owner | Notes |
+|---|------|--------|--------|
+| 1 | **run-pipeline on a schedule** | Dev | ✅ Done. Daily cron: [run-pipeline-part1](src/app/api/cron/run-pipeline-part1/route.ts) at 10:00 UTC, [run-pipeline-part2](src/app/api/cron/run-pipeline-part2/route.ts) at 11:00 UTC (after ingest at 09:00). |
+| 2 | **OilStressSignal / Energy Shock Risk** | Dev | **Back burner.** GeopoliticsVolume_z + OilNewsVolume_z &gt; 2 → show “Energy Shock Risk” on Intelligence. Revisit when needed. |
+
+---
+
+### This week / Backlog (pick as needed)
+
+Items from [ARCHITECTURE_AUDIT.md](ARCHITECTURE_AUDIT.md) and ops improvements. None are blocking.
+
+| # | Task | Notes |
+|---|------|--------|
+| 1 | **Auth: session token** | Replace password-in-cookie with signed session token or DB-backed session; optionally protect `/intelligence` and `/weekly` when `DASHBOARD_PASSWORD` is set. |
+| 2 | **Cron secret: fail closed** | In production, require `CRON_SECRET` (return 401 when unset) so cron endpoints aren’t publicly callable. |
+| 3 | **Retries for pipeline / ingest** | Add retries with backoff for transient DB/API failures in pipeline steps or ingest. |
+| 4 | **Backfill batching** | backfill-articles does one Supabase round-trip per article; batch where the API allows to reduce latency and failure points. |
+| 5 | **Backtest windows (1y, 3y, 5y)** | [OIL_GAS_SIGNAL_PLAN.md](OIL_GAS_SIGNAL_PLAN.md) Phase 3: add longer backtest windows and persist separate BacktestResult rows. |
+
+---
+
 ## Summary
 
 - **Phase 1 (done):** Oil & Gas on Intelligence, AI tags to Event, tag vetting, two dropdowns, stronger keywords.
-- **Phase 2:** EIA + rig data, 5-component oil composite, Oil UI with Inventory/Rig.
-- **Phase 3:** Pharma composite (HealthcareSentiment, HealthcareVolume, XLV momentum), News API sector queries, Intelligence Pharma section.
+- **Phase 2 (done):** EIA + rig data, fetch-fundamentals cron, 5-component oil composite, Oil UI with Inventory/Rig.
+- **Phase 3 (done):** Pharma composite, XLV, News API sector queries, Intelligence Pharma section.
+- **Next:** run-pipeline on daily schedule (10:00 + 11:00 UTC). OilStressSignal on back burner.
 - **Twitter (parked):** Not in current roadmap.
 
 This file is the single place for rollout order and task lists.

@@ -7,7 +7,7 @@
 ## How the data flows (so you know where it can break)
 
 ```
-News API / "Fetch news now"
+RSS feeds / "Fetch news now"
     → ingest (Supabase Article table + Blob feed)
     → createEventFromArticle() for each NEW article only → Event table
 
@@ -100,7 +100,7 @@ Intelligence page
 
 | Endpoint | Purpose |
 |----------|--------|
-| `GET /api/cron/ingest-news?secret=...` | Fetch news from News API, ingest into Supabase + Blob, create Events for new articles, then run pipeline. |
+| `GET /api/cron/ingest-news?secret=...` | Fetch news from configured RSS feeds, ingest into Supabase + Blob, create Events for new articles, then run pipeline. |
 | `GET /api/cron/backfill-events?secret=...` | Create Event rows for existing articles that don’t have one. |
 | `GET /api/cron/backfill-events?secret=...&runPipeline=1` | Same as above, then run the full ML pipeline (fixes Intelligence in one call). |
 | `GET /api/cron/run-pipeline?secret=...` | Run the full ML pipeline (may timeout on Vercel 60s limit). |

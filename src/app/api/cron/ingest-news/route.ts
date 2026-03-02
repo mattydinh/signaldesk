@@ -26,7 +26,7 @@ export const maxDuration = 120;
 
 /**
  * GET /api/cron/ingest-news
- * Fetches business + general headlines from News API, ingests them, and auto-tags new articles.
+ * Fetches headlines from configured RSS feeds, ingests them, and auto-tags new articles.
  * Also runs the ML pipeline to populate Intelligence (signals, regime, backtest).
  * Set GROQ_API_KEY or OPENAI_API_KEY to auto-tag. CRON_SECRET required.
  */
@@ -43,10 +43,7 @@ export async function GET(request: NextRequest) {
 
   const result = await fetchAndIngestNews();
   if (!result.ok) {
-    return NextResponse.json(
-      { error: result.error },
-      { status: result.error.includes("NEWS_API_KEY") ? 503 : 500 }
-    );
+    return NextResponse.json({ error: result.error }, { status: 500 });
   }
 
   const origin = request.nextUrl.origin;

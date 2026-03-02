@@ -41,11 +41,18 @@ export default function FetchNewsButton() {
         router.refresh();
       }
       setStatus("success");
-      setMessage(
-        result.total === 0
-          ? "No new articles from News API."
-          : `Loaded ${result.created} new article${result.created !== 1 ? "s" : ""} (${result.skipped} already existed).${shouldAnalyze ? " Analysis complete." : ""}`
-      );
+      const created = result.created ?? 0;
+      const skipped = result.skipped ?? 0;
+      const totalFetched = result.total ?? 0;
+      let msg: string;
+      if (totalFetched === 0) {
+        msg = "No new articles from RSS feeds.";
+      } else if (created === 0) {
+        msg = `No new articles — the ${totalFetched} we fetched were already in your feed from these RSS sources. To see newer stories, check that your RSS feeds are updating and that RSS_FEEDS is configured correctly.`;
+      } else {
+        msg = `Loaded ${created} new article${created !== 1 ? "s" : ""}${skipped > 0 ? ` (${skipped} already in feed)` : ""}.${shouldAnalyze ? " Analysis complete." : ""}`;
+      }
+      setMessage(msg);
     } catch (e: unknown) {
       setStatus("error");
       const err = e as { message?: string; digest?: string };

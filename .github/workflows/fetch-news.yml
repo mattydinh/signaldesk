@@ -1,7 +1,6 @@
-# Fetches from News API and POSTs articles to your app's ingest endpoint.
-# Add repo secrets: NEWS_API_KEY, INGEST_URL (e.g. https://signaldesk-chi.vercel.app), INGEST_API_KEY (optional).
-# Note: News API free tier may block/restrict requests from GitHub; running the script locally is more reliable.
-name: Fetch news and post to app
+# Triggers your app's ingest/pipeline via HTTP.
+# Add repo secrets: INGEST_URL (e.g. https://signaldesk-chi.vercel.app), CRON_SECRET.
+name: Fetch news (RSS) and run pipeline
 
 on:
   schedule:
@@ -16,36 +15,32 @@ jobs:
 
       - name: Check required secrets
         run: |
-          if [ -z "${{ secrets.NEWS_API_KEY }}" ]; then
-            echo "::error::Repository secret NEWS_API_KEY is not set. Add it in Settings → Secrets and variables → Actions."
-            exit 1
-          fi
           if [ -z "${{ secrets.INGEST_URL }}" ]; then
             echo "::error::Repository secret INGEST_URL is not set. Add it in Settings → Secrets and variables → Actions."
             exit 1
           fi
-          echo "Secrets present (NEWS_API_KEY, INGEST_URL)."
+          if [ -z "${{ secrets.CRON_SECRET }}" ]; then
+            echo "::error::Repository secret CRON_SECRET is not set. Add it in Settings → Secrets and variables → Actions."
+            exit 1
+          fi
+          echo "Secrets present (INGEST_URL, CRON_SECRET)."
 
-      - name: Set up Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: "npm"
-
-      - name: Fetch news and POST to app
+      - name: Call ingest-news cron (RSS ingest)
         env:
-          CI: "true"
-          NEWS_API_KEY: ${{ secrets.NEWS_API_KEY }}
           INGEST_URL: ${{ secrets.INGEST_URL }}
-          INGEST_API_KEY: ${{ secrets.INGEST_API_KEY }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |
-          node scripts/fetch-news-dev.mjs 2>&1
-          EXIT=$?
-          if [ $EXIT -ne 0 ]; then
-            echo "::error::Fetch or ingest failed (exit $EXIT). Scroll up in this step to see the script error."
+          if [ -z "$CRON_SECRET" ]; then
+            echo "::error::Repository secret CRON_SECRET is not set."
+            exit 1
           fi
-          exit $EXIT
+          BASE_URL="$INGEST_URL"
+          case "$BASE_URL" in
+            http://*|https://*) ;;
+            *) BASE_URL="https://$BASE_URL" ;;
+          esac
+          echo "Calling $BASE_URL/api/cron/ingest-news"
+          curl -sS -L -f -H "Authorization: Bearer $CRON_SECRET" -H "Accept: application/json" "$BASE_URL/api/cron/ingest-news"
 
       - name: Run ML pipeline (part 1)
         env:
