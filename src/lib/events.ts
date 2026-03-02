@@ -72,3 +72,29 @@ export async function createEventFromArticle(input: {
     console.error("[events] createEventFromArticle (Prisma)", e);
   }
 }
+
+/**
+ * Sync AI-assigned categories from Article to the corresponding Event (same id).
+ * Called after analyze so the pipeline uses Event.categories when present; fallback remains inferCategoriesFromText.
+ */
+export async function syncEventCategoriesFromArticle(articleId: string, categories: string[]): Promise<void> {
+  if (hasSupabaseDb()) {
+    try {
+      const supabase = getSupabaseAdmin();
+      if (supabase) {
+        await (supabase as any).from("Event").update({ categories }).eq("id", articleId);
+      }
+    } catch (e) {
+      console.error("[events] syncEventCategoriesFromArticle (Supabase)", e);
+    }
+    return;
+  }
+  try {
+    await prisma.event.update({
+      where: { id: articleId },
+      data: { categories },
+    });
+  } catch (e) {
+    console.error("[events] syncEventCategoriesFromArticle (Prisma)", e);
+  }
+}

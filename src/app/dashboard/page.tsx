@@ -304,6 +304,12 @@ export default async function DashboardPage({
           <p className="text-body text-[#71717A] max-w-2xl">
             This feed continuously aggregates and analyzes relevant finance and political news, updating in real time. New articles are added regularly to keep you informed.
           </p>
+          <p className="mt-2">
+            <Link href="/dashboard/audit-tags" className="text-body text-[#A1A1AA] hover:text-[#FAFAFA] focus-visible:underline">
+              Tag audit
+            </Link>
+            <span className="text-meta text-[#71717A] ml-2">— spot-check AI-assigned categories before using them for signals.</span>
+          </p>
         </section>
 
         <section className="mb-16" aria-label="Filters and actions">

@@ -46,6 +46,57 @@ async function getLatestBacktestResults() {
   }
 }
 
+const OIL_COMPONENT_SIGNALS = ["OilPriceMomentum", "EnergySentiment", "OilNewsVolume"] as const;
+const OIL_COMPOSITE_NAME = "OilCompositeSignal";
+
+async function getLatestOilComponents() {
+  try {
+    const since = new Date();
+    since.setDate(since.getDate() - 7);
+    const rows = await prisma.derivedSignal.findMany({
+      where: {
+        signalName: { in: [...OIL_COMPONENT_SIGNALS, OIL_COMPOSITE_NAME] },
+        date: { gte: since },
+      },
+      orderBy: { date: "desc" },
+    });
+    const byName = new Map<string, { zscore: number; date: Date }>();
+    for (const r of rows) {
+      if (!byName.has(r.signalName))
+        byName.set(r.signalName, { zscore: r.zscore, date: r.date });
+    }
+    return byName;
+  } catch {
+    return new Map();
+  }
+}
+
+async function getOilCompositeSeries(days = 90) {
+  try {
+    const since = new Date();
+    since.setDate(since.getDate() - days);
+    const signals = await prisma.derivedSignal.findMany({
+      where: { signalName: OIL_COMPOSITE_NAME, date: { gte: since } },
+      orderBy: { date: "asc" },
+    });
+    return signals;
+  } catch {
+    return [];
+  }
+}
+
+async function getOilBacktestResults() {
+  try {
+    const results = await prisma.backtestResult.findMany({
+      where: { signalName: OIL_COMPOSITE_NAME, ticker: { in: ["USO", "XLE", "SPY"] } },
+      orderBy: { endDate: "desc" },
+    });
+    return results;
+  } catch {
+    return [];
+  }
+}
+
 const REGIME_TOOLTIPS: Record<string, string> = {
   "Risk-On": "Investors are increasing exposure to equities and higher-risk assets.",
   "Risk-Off": "Investors are rotating into defensive assets (bonds, gold, cash).",
@@ -61,10 +112,13 @@ function regimeBadgeClass(regime: string): string {
 }
 
 export default async function IntelligencePage() {
-  let [regime, signals, backtestResults] = await Promise.all([
+  let [regime, signals, backtestResults, oilComponents, oilCompositeSeries, oilBacktests] = await Promise.all([
     getLatestRegime(),
     getRecentSignals(),
     getLatestBacktestResults(),
+    getLatestOilComponents(),
+    getOilCompositeSeries(),
+    getOilBacktestResults(),
   ]);
 
   const hasData = regime != null || signals.length > 0 || backtestResults.length > 0;
@@ -74,10 +128,13 @@ export default async function IntelligencePage() {
   if (!hasData) {
     try {
       await runPipeline();
-      [regime, signals, backtestResults] = await Promise.all([
+      [regime, signals, backtestResults, oilComponents, oilCompositeSeries, oilBacktests] = await Promise.all([
         getLatestRegime(),
         getRecentSignals(),
         getLatestBacktestResults(),
+        getLatestOilComponents(),
+        getOilCompositeSeries(),
+        getOilBacktestResults(),
       ]);
     } catch (e) {
       console.error("[intelligence] pipeline run failed", e);
@@ -87,6 +144,7 @@ export default async function IntelligencePage() {
   }
 
   const hasDataNow = regime != null || signals.length > 0 || backtestResults.length > 0;
+  const oilZ = oilComponents.get(OIL_COMPOSITE_NAME)?.zscore ?? null;
 
   return (
     <div className="min-h-screen gradient-mesh">
@@ -229,6 +287,91 @@ export default async function IntelligencePage() {
             ) : (
               <p className="text-body text-[#71717A]">
                 No regime data yet. Run the pipeline (button below) or fetch news first so events exist.
+              </p>
+            )}
+          </div>
+        </section>
+
+        {/* Oil & Gas */}
+        <section className="mb-16" aria-label="Oil & Gas">
+          <div className="glass-card rounded-card border border-[#27272A] p-8">
+            <h2 className="text-section-header text-foreground mb-1">Oil & Gas</h2>
+            <p className="text-meta text-[#71717A] mb-4">
+              Composite from price momentum (30d), Energy sentiment, and Energy volume. Gauge and backtest vs USO, XLE, SPY. No EIA/rig in this phase.
+            </p>
+            {oilZ != null ? (
+              <>
+                <div className="mb-4">
+                  <p className="text-meta text-[#71717A] mb-2">Composite z-score (latest)</p>
+                  <div className="h-3 w-full max-w-md rounded-pill bg-[#27272A] overflow-hidden flex">
+                    <div
+                      className="h-full rounded-pill transition-all"
+                      style={{
+                        width: `${Math.min(100, Math.max(0, ((oilZ + 3) / 6) * 100))}%`,
+                        backgroundColor: oilZ >= 1 ? "#34D399" : oilZ <= -1 ? "#F87171" : "#71717A",
+                      }}
+                    />
+                  </div>
+                  <p className="text-body text-foreground mt-1">
+                    {oilZ <= -2 ? "Strong Bearish" : oilZ <= -1 ? "Bearish" : oilZ < 1 ? "Neutral" : oilZ < 2 ? "Bullish" : "Strong Bullish"} ({oilZ.toFixed(2)})
+                  </p>
+                </div>
+                <div className="overflow-x-auto rounded-card border border-[#27272A] mb-6">
+                  <table className="w-full text-body">
+                    <thead>
+                      <tr className="border-b border-[#27272A] bg-[#18181B]/40">
+                        <th className="px-4 py-3 text-left font-medium text-foreground">Component</th>
+                        <th className="px-4 py-3 text-right font-medium text-foreground">z-score</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {OIL_COMPONENT_SIGNALS.map((name) => (
+                        <tr key={name} className="border-b border-[#27272A]/60">
+                          <td className="px-4 py-3 text-foreground">{name}</td>
+                          <td className="px-4 py-3 text-right text-[#A1A1AA]">
+                            {oilComponents.get(name) != null ? oilComponents.get(name)!.zscore.toFixed(2) : "—"}
+                          </td>
+                        </tr>
+                      ))}
+                      <tr className="border-b border-[#27272A]/60">
+                        <td className="px-4 py-3 text-foreground">Inventory</td>
+                        <td className="px-4 py-3 text-right text-[#71717A]">—</td>
+                      </tr>
+                      <tr className="border-b border-[#27272A]/60">
+                        <td className="px-4 py-3 text-foreground">Rig</td>
+                        <td className="px-4 py-3 text-right text-[#71717A]">—</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                {oilCompositeSeries.length > 0 && (
+                  <div className="mb-6">
+                    <p className="text-meta text-[#71717A] mb-2">Oil composite z over time</p>
+                    <SignalChart
+                      signals={oilCompositeSeries.map((s) => ({
+                        date: s.date.toISOString().slice(0, 10),
+                        signalName: s.signalName,
+                        zscore: s.zscore,
+                      }))}
+                    />
+                  </div>
+                )}
+                {oilBacktests.length > 0 && (
+                  <div>
+                    <p className="text-meta text-[#71717A] mb-2">Backtest: OilCompositeSignal vs tickers</p>
+                    <ul className="space-y-2 text-body text-[#A1A1AA]">
+                      {oilBacktests.map((r) => (
+                        <li key={`${r.ticker}-${r.endDate.toISOString().slice(0, 10)}`}>
+                          {r.ticker}: Sharpe {r.sharpe.toFixed(2)}, Max DD {(r.maxDrawdown * 100).toFixed(1)}%, Ann return {((r.annualizedReturn ?? 0) * 100).toFixed(1)}%, Hit rate {(r.hitRate * 100).toFixed(0)}%
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </>
+            ) : (
+              <p className="text-body text-[#71717A]">
+                No oil composite data yet. Run the pipeline (part 1 + part 2) so derived signals and oil signals are computed.
               </p>
             )}
           </div>

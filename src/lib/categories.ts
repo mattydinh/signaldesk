@@ -47,8 +47,8 @@ const CATEGORY_KEYWORDS: { category: string; keywords: RegExp }[] = [
   { category: "Markets", keywords: /market|stock|s&p|dow|nasdaq|trading|inflation|recession|rate cut|earnings|index/i },
   { category: "Finance", keywords: /bank|barclays|jpmorgan|goldman|morgan stanley|merger|acquisition|ipo|dividend|revenue|profit/i },
   { category: "Technology", keywords: /ai\b|artificial intelligence|nvidia|tech|software|apple|microsoft|google|amazon|chip|semiconductor/i },
-  { category: "Energy", keywords: /oil|gas|energy|renewable|solar|wind|opec|ev\b|electric vehicle/i },
-  { category: "Healthcare", keywords: /healthcare|pharma|drug|fda|vaccine|medical|biotech|hospital/i },
+  { category: "Energy", keywords: /oil|gas|energy|renewable|solar|wind|opec|ev\b|electric vehicle|crude|wti|brent|refinery|petroleum|drilling|rig|eia|inventory|energy sector|xle/i },
+  { category: "Healthcare", keywords: /healthcare|pharma|drug|fda|vaccine|medical|biotech|hospital|approval|phase 3|clinical trial|glp-1|ozempic|wegovy|mounjaro|drug approval|therapy|treatment|rx|pharmaceutical/i },
   { category: "Political", keywords: /election|trump|biden|congress|vote|senate|house|white house|political/i },
   { category: "Geopolitics", keywords: /china|russia|europe|sanction|trade war|tariff|foreign policy/i },
 ];

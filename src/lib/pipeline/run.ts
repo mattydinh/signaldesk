@@ -5,16 +5,18 @@
 import { runEventFeatures } from "@/lib/pipeline/event-features";
 import { runDailyTopicMetrics } from "@/lib/pipeline/daily-topic-metrics";
 import { runDerivedSignals } from "@/lib/pipeline/derived-signals";
+import { runOilSignals } from "@/lib/pipeline/oil-signals";
 import { runMarketPrices } from "@/lib/pipeline/market-prices";
 import { runRegime } from "@/lib/pipeline/regime";
 import { runBacktest } from "@/lib/pipeline/backtest";
 
-/** Part 1: events → features → topic metrics → derived signals (often ~30–50s). */
+/** Part 1: events → features → topic metrics → derived signals → oil signals (often ~30–50s). */
 export async function runPipelinePart1(): Promise<Record<string, unknown>> {
   const results: Record<string, unknown> = {};
   results.event_features = await runEventFeatures(200);
   results.daily_topic_metrics = await runDailyTopicMetrics(90);
   results.derived_signals = await runDerivedSignals(90);
+  results.oil_signals = await runOilSignals(90);
   return results;
 }
 
@@ -26,6 +28,12 @@ export async function runPipelinePart2(): Promise<Record<string, unknown>> {
   const signals = ["GeopoliticsVolume", "RegulationVolume", "MarketsSentiment"];
   for (const sig of signals) {
     await runBacktest(sig, "SPY").catch((e) => console.error("[run-pipeline] backtest", sig, e));
+  }
+  const oilTickers = ["USO", "XLE", "SPY"];
+  for (const ticker of oilTickers) {
+    await runBacktest("OilCompositeSignal", ticker).catch((e) =>
+      console.error("[run-pipeline] backtest OilCompositeSignal", ticker, e)
+    );
   }
   results.backtest = "ok";
   return results;

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { hasSupabaseDb } from "@/lib/supabase-server";
 import { getArticleByIdSupabase, updateArticleAnalysisSupabase } from "@/lib/data-supabase";
+import { syncEventCategoriesFromArticle } from "@/lib/events";
 
 import { ARTICLE_CATEGORIES } from "@/lib/categories";
 
@@ -184,6 +185,7 @@ export async function POST(
         },
       });
     }
+    await syncEventCategoriesFromArticle(id, categories);
 
     return NextResponse.json({
       ok: true,
