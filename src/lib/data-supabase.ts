@@ -80,6 +80,54 @@ export async function getArticlesSupabase(options: {
     });
   }
 
+  // When Supabase is configured, use it as source of truth (newest first, full table).
+  const supabaseFirst = getSupabaseAdmin();
+  if (supabaseFirst) {
+    const sb = supabaseFirst as any;
+    const cols = "id,sourceId,title,summary,url,publishedAt,externalId,entities,topics,categories,opportunities,implications,forShareholders,forInvestors,forBusiness";
+    const from = options.offset;
+    const to = options.offset + options.limit - 1;
+    let q = sb.from(ARTICLE_TABLE).select(cols, { count: "exact" }).order("publishedAt", { ascending: false }).range(from, to);
+    if (publishedAfter) q = q.gte("publishedAt", publishedAfter);
+    if (publishedBefore) q = q.lte("publishedAt", publishedBefore);
+    if (options.sourceId) q = q.eq("sourceId", options.sourceId);
+    if (options.category) q = q.contains("categories", [options.category]);
+    if (options.q?.trim()) {
+      const t = options.q.trim().slice(0, 200);
+      const pattern = `%${t.replace(/%/g, "\\%")}%`;
+      q = q.or(`title.ilike.${pattern},summary.ilike.${pattern}`);
+    }
+    let result = await q;
+    let data = (result as { data?: unknown }).data;
+    let count = typeof (result as { count?: number }).count === "number" ? (result as { count: number }).count : null;
+    let err = (result as { error?: unknown }).error;
+    if (err && ARTICLE_TABLE_ALT) {
+      let qAlt = sb.from(ARTICLE_TABLE_ALT).select(cols, { count: "exact" }).order("publishedAt", { ascending: false }).range(from, to);
+      if (publishedAfter) qAlt = qAlt.gte("publishedAt", publishedAfter);
+      if (publishedBefore) qAlt = qAlt.lte("publishedAt", publishedBefore);
+      if (options.sourceId) qAlt = qAlt.eq("sourceId", options.sourceId);
+      if (options.category) qAlt = qAlt.contains("categories", [options.category]);
+      if (options.q?.trim()) {
+        const t = options.q.trim().slice(0, 200);
+        const pattern = `%${t.replace(/%/g, "\\%")}%`;
+        qAlt = qAlt.or(`title.ilike.${pattern},summary.ilike.${pattern}`);
+      }
+      const alt = await qAlt;
+      data = (alt as { data?: unknown }).data;
+      count = typeof (alt as { count?: number }).count === "number" ? (alt as { count: number }).count : null;
+      err = (alt as { error?: unknown }).error;
+    }
+    if (!err && Array.isArray(data)) {
+      const articles = data as ArticleRow[];
+      const total = count ?? articles.length;
+      const withInferred = articles.map((a) => ({
+        ...a,
+        categories: a.categories?.length ? a.categories : inferCategoriesFromText(a.title ?? null, a.summary ?? null),
+      }));
+      return { articles: withInferred, total };
+    }
+  }
+
   if (hasBlobFeed()) {
     const blobFeed = await readFeedFromBlob();
     if (blobFeed && blobFeed.length > 0) {
@@ -157,64 +205,7 @@ export async function getArticlesSupabase(options: {
     }
   }
 
-  const supabase = getSupabaseAdmin();
-  if (!supabase) return { articles: [], total: 0 };
-  const sb = supabase as any;
-  const cols = "id,sourceId,title,summary,url,publishedAt,externalId,entities,topics,categories,opportunities,implications,forShareholders,forInvestors,forBusiness";
-
-  async function run(table: string): Promise<{ data: unknown; count: number | null; error: unknown }> {
-    let q = sb.from(table).select(cols, { count: "exact" }).order("publishedAt", { ascending: false }).limit(options.limit);
-    if (publishedAfter) q = q.gte("publishedAt", publishedAfter);
-    if (publishedBefore) q = q.lte("publishedAt", publishedBefore);
-    if (options.sourceId) q = q.eq("sourceId", options.sourceId);
-    if (options.category) q = q.contains("categories", [options.category]);
-    if (options.q?.trim()) {
-      const t = options.q.trim().slice(0, 200);
-      const pattern = `%${t.replace(/%/g, "\\%")}%`;
-      q = q.or(`title.ilike.${pattern},summary.ilike.${pattern}`);
-    }
-    const result = await q;
-    const count = typeof (result as { count?: number }).count === "number" ? (result as { count: number }).count : null;
-    return { data: (result as { data?: unknown }).data, count, error: (result as { error?: unknown }).error };
-  }
-
-  let out = await run(ARTICLE_TABLE);
-  if (out.error) {
-    console.error("[data-supabase] getArticles", ARTICLE_TABLE, out.error);
-    if (ARTICLE_TABLE_ALT) {
-      out = await run(ARTICLE_TABLE_ALT);
-      if (out.error) {
-        console.error("[data-supabase] getArticles fallback", ARTICLE_TABLE_ALT, out.error);
-        return { articles: [], total: 0 };
-      }
-    } else {
-      return { articles: [], total: 0 };
-    }
-  }
-  let articles = Array.isArray(out.data) ? (out.data as ArticleRow[]) : [];
-  let total = out.count ?? articles.length;
-  if (articles.length <= 1 && total <= 1 && ARTICLE_TABLE_ALT) {
-    const alt = await run(ARTICLE_TABLE_ALT);
-    if (!alt.error && Array.isArray(alt.data) && (alt.data as ArticleRow[]).length > articles.length) {
-      articles = alt.data as ArticleRow[];
-      total = alt.count ?? articles.length;
-    }
-  }
-  if (articles.length <= 1) {
-    const cached = getFeedCache();
-    if (cached.length > articles.length) {
-      const withInferred = cached.map((a) => ({
-        ...a,
-        categories: a.categories?.length ? a.categories : inferCategoriesFromText(a.title ?? null, a.summary ?? null),
-      }));
-      return { articles: withInferred, total: cached.length };
-    }
-  }
-  const withInferred = articles.map((a) => ({
-    ...a,
-    categories: a.categories?.length ? a.categories : inferCategoriesFromText(a.title ?? null, a.summary ?? null),
-  }));
-  return { articles: withInferred, total };
+  return { articles: [], total: 0 };
 }
 
 export type IngestArticleInput = {
@@ -341,8 +332,25 @@ export async function ingestArticlesSupabase(
 
   if (feedEntries.length > 0) {
     setFeedCache(feedEntries);
-    if (hasBlobFeed()) await writeFeedToBlob(feedEntries);
-    if (hasKvFeed()) await writeFeedToKv(feedEntries);
+    const mergeAndSort = (existing: CachedArticle[] | null): CachedArticle[] => {
+      const byId = new Map<string, CachedArticle>(feedEntries.map((a) => [a.id, a]));
+      for (const a of existing ?? []) {
+        if (!byId.has(a.id)) byId.set(a.id, a);
+      }
+      return [...byId.values()].sort((a, b) => {
+        const tA = a.publishedAt ? new Date(a.publishedAt).getTime() : 0;
+        const tB = b.publishedAt ? new Date(b.publishedAt).getTime() : 0;
+        return tB - tA;
+      });
+    };
+    if (hasBlobFeed()) {
+      const existing = await readFeedFromBlob();
+      await writeFeedToBlob(mergeAndSort(existing));
+    }
+    if (hasKvFeed()) {
+      const existing = await readFeedFromKv();
+      await writeFeedToKv(mergeAndSort(existing));
+    }
   }
 
   return { created, skipped, total: articles.length, newArticleIds };

@@ -35,7 +35,7 @@ npm run dev
 | **SUPABASE_URL** | Yes (recommended) | Supabase project URL (e.g. `https://xxx.supabase.co`) |
 | **SUPABASE_SERVICE_ROLE_KEY** | Yes (recommended) | Supabase API → service_role secret. Used for ingest, articles, sources. |
 | **BLOB_READ_WRITE_TOKEN** | For feed list | Vercel Blob store token. When set, feed list is read/written from Blob so the dashboard shows all articles. |
-| **NEWS_API_KEY** | For “Fetch news now” | [newsapi.org](https://newsapi.org) key. |
+| **NEWS_API_KEY** | For “Fetch news now” | [newsapi.org](https://newsapi.org) key. Free tier is dev-only; production needs a paid plan. |
 | **GROQ_API_KEY** | For summaries | [console.groq.com](https://console.groq.com) — preferred (free tier). Or **OPENAI_API_KEY** for OpenAI. |
 | **DASHBOARD_PASSWORD** | Optional | If set, /dashboard requires login via /login. |
 | **CRON_SECRET** | Optional | Protects cron endpoints (ingest-news, prune-articles, generate-weekly-summary). |

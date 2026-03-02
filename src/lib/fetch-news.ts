@@ -26,6 +26,8 @@ export async function fetchAndIngestNews(): Promise<FetchNewsResult> {
   ] as const;
   const allArticles: IngestArticle[] = [];
   const seen = new Set<string>();
+  let lastApiError: string | null = null;
+  let anyRequestSucceeded = false;
 
   function pushArticle(a: { source?: { id?: string; name?: string }; title?: string; description?: string; url?: string; publishedAt?: string }) {
     if (!a.title) return;
@@ -50,20 +52,31 @@ export async function fetchAndIngestNews(): Promise<FetchNewsResult> {
       const res = await fetch(url, { cache: "no-store" });
       if (!res.ok) {
         const err = await res.text();
-        console.error("[fetch-news] News API error", res.status, err);
+        lastApiError = `News API ${res.status}: ${err.slice(0, 200)}`;
+        console.error("[fetch-news]", lastApiError);
         continue;
       }
+      anyRequestSucceeded = true;
       const raw = await res.json() as { status: string; articles?: Array<{ source?: { id?: string; name?: string }; title?: string; description?: string; url?: string; publishedAt?: string }> };
       const data = raw;
       if (data.status !== "ok" || !Array.isArray(data.articles)) continue;
-
       for (const a of data.articles) pushArticle(a);
     }
 
+    const fromDate = new Date();
+    fromDate.setDate(fromDate.getDate() - 2);
+    const fromParam = fromDate.toISOString().slice(0, 10);
+
     for (const { q } of sectorQueries) {
-      const url = `https://newsapi.org/v2/everything?q=${encodeURIComponent(q)}&language=en&sortBy=publishedAt&pageSize=15&apiKey=${newsApiKey}`;
+      const url = `https://newsapi.org/v2/everything?q=${encodeURIComponent(q)}&language=en&sortBy=publishedAt&pageSize=15&from=${fromParam}&apiKey=${newsApiKey}`;
       const res = await fetch(url, { cache: "no-store" });
-      if (!res.ok) continue;
+      if (!res.ok) {
+        const err = await res.text();
+        if (!lastApiError) lastApiError = `News API everything ${res.status}: ${err.slice(0, 200)}`;
+        console.error("[fetch-news] everything", res.status, err.slice(0, 200));
+        continue;
+      }
+      anyRequestSucceeded = true;
       const raw = await res.json() as { status: string; articles?: Array<{ source?: { id?: string; name?: string }; title?: string; description?: string; url?: string; publishedAt?: string }> };
       if (raw.status !== "ok" || !Array.isArray(raw.articles)) continue;
       for (const a of raw.articles) pushArticle(a);
@@ -75,6 +88,14 @@ export async function fetchAndIngestNews(): Promise<FetchNewsResult> {
   }
 
   if (allArticles.length === 0) {
+    if (lastApiError || !anyRequestSucceeded) {
+      return {
+        ok: false,
+        error:
+          lastApiError ??
+          "News API returned no articles. The free tier only works in development; production requires a paid plan at newsapi.org. Add NEWS_API_KEY in Vercel and ensure your plan allows production use.",
+      };
+    }
     return { ok: true, created: 0, skipped: 0, total: 0, newArticleIds: [] };
   }
 
