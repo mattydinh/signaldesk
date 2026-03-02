@@ -64,7 +64,7 @@ export default function SignalChart({ signals, mode }: SignalChartProps) {
   const options = useMemo(() => {
     if (mode === "sentiment") return sentimentOptions;
     if (mode === "volume") return volumeOptions;
-    const all = [...new Set([...sentimentOptions, ...volumeOptions])];
+    const all = Array.from(new Set([...sentimentOptions, ...volumeOptions]));
     if (all.length > 0) return all;
     return Array.from(byName.keys()).sort();
   }, [mode, sentimentOptions, volumeOptions, byName]);
