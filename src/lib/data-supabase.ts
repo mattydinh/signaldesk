@@ -303,140 +303,141 @@ export async function ingestArticlesSupabase(
   if (!supabase) return { created: 0, skipped: 0, total: articles.length, newArticleIds: [] };
   const sb = supabase as any;
 
+  const validArticles = articles.filter((a) => a.title && a.sourceName);
+  let skipped = articles.length - validArticles.length;
   let created = 0;
-  let skipped = 0;
   const newArticleIds: string[] = [];
   const feedEntries: CachedArticle[] = [];
-  const sourceIdCache = new Map<string, string>(); // slug → sourceId, avoid repeat lookups
 
-  for (const a of articles) {
-    if (!a.title || !a.sourceName) {
-      skipped++;
-      continue;
+  // ── 1. Batch-resolve sources: one SELECT for all unique slugs ──
+  const sourceIdCache = new Map<string, string>(); // slug → id
+  const uniqueSlugs = Array.from(new Set(validArticles.map((a) => a.sourceSlug ?? slugify(a.sourceName))));
+  const sourceTables = [SOURCE_TABLE, SOURCE_TABLE_ALT, "sources"].filter(Boolean) as string[];
+  let resolvedSourceTable: string | null = null;
+  for (const t of sourceTables) {
+    const res = await sb.from(t).select("id, slug").in("slug", uniqueSlugs);
+    if (!res.error && Array.isArray(res.data)) {
+      resolvedSourceTable = t;
+      for (const s of res.data as { id: string; slug: string }[]) sourceIdCache.set(s.slug, s.id);
+      break;
     }
-
-    const slug = a.sourceSlug ?? slugify(a.sourceName);
-
-    let sourceId: string;
-    if (sourceIdCache.has(slug)) {
-      sourceId = sourceIdCache.get(slug)!;
-    } else {
-      let existingSourceRes = await sb.from(SOURCE_TABLE).select("id").eq("slug", slug).maybeSingle();
-      let existingSource = (existingSourceRes as { data?: unknown }).data;
-      if (!existingSource && SOURCE_TABLE_ALT) {
-        existingSourceRes = await sb.from(SOURCE_TABLE_ALT).select("id").eq("slug", slug).maybeSingle();
-        existingSource = (existingSourceRes as { data?: unknown }).data;
+  }
+  // Insert only the missing sources (usually 0; new sources are rare)
+  for (const slug of uniqueSlugs.filter((s) => !sourceIdCache.has(s))) {
+    const a = validArticles.find((a) => (a.sourceSlug ?? slugify(a.sourceName)) === slug)!;
+    const payload = { name: a.sourceName, slug, baseUrl: a.sourceBaseUrl ?? null };
+    const tables = resolvedSourceTable ? [resolvedSourceTable] : sourceTables;
+    for (const t of tables) {
+      const res = await sb.from(t).insert(payload).select("id").single();
+      if (!res.error && (res.data as any)?.id) {
+        sourceIdCache.set(slug, (res.data as any).id);
+        break;
       }
-      if (!existingSource && SOURCE_TABLE !== "sources") {
-        existingSourceRes = await sb.from("sources").select("id").eq("slug", slug).maybeSingle();
-        existingSource = (existingSourceRes as { data?: unknown }).data;
-      }
-
-      const existingId = (existingSource as { id?: string } | null)?.id;
-      if (existingId) {
-        sourceId = existingId;
-      } else {
-        const sourcePayload = { name: a.sourceName, slug, baseUrl: a.sourceBaseUrl ?? null };
-        let insertSourceRes = await sb.from(SOURCE_TABLE).insert(sourcePayload).select("id").single();
-        let newSource = (insertSourceRes as { data?: unknown }).data;
-        let insertSourceErr = (insertSourceRes as { error?: unknown }).error;
-        const firstSourceErr = (insertSourceErr as { message?: string })?.message;
-        if (insertSourceErr && SOURCE_TABLE_ALT) {
-          insertSourceRes = await sb.from(SOURCE_TABLE_ALT).insert(sourcePayload).select("id").single();
-          newSource = (insertSourceRes as { data?: unknown }).data;
-          insertSourceErr = (insertSourceRes as { error?: unknown }).error;
-        }
-        if (insertSourceErr && SOURCE_TABLE !== "sources") {
-          insertSourceRes = await sb.from("sources").insert(sourcePayload).select("id").single();
-          newSource = (insertSourceRes as { data?: unknown }).data;
-          insertSourceErr = (insertSourceRes as { error?: unknown }).error;
-        }
-        if (insertSourceErr || !(newSource as { id?: string })?.id) {
-          console.error("[data-supabase] insert source failed | first:", firstSourceErr, "| last:", (insertSourceErr as { message?: string })?.message);
-          skipped++;
-          continue;
-        }
-        sourceId = (newSource as { id: string }).id;
-      }
-      sourceIdCache.set(slug, sourceId);
+      console.error("[data-supabase] insert source failed", t, (res.error as any)?.message);
     }
-
-    if (a.externalId) {
-      let existingArt = await sb.from(ARTICLE_TABLE).select("id").eq("sourceId", sourceId).eq("externalId", a.externalId).maybeSingle();
-      let existing = (existingArt as { data?: unknown }).data;
-      if (!existing && ARTICLE_TABLE_ALT) {
-        existingArt = await sb.from(ARTICLE_TABLE_ALT).select("id").eq("sourceId", sourceId).eq("externalId", a.externalId).maybeSingle();
-        existing = (existingArt as { data?: unknown }).data;
-      }
-      const existingArticleId = (existing as { id?: string })?.id;
-      if (existingArticleId) {
-        skipped++;
-        feedEntries.push(toCachedArticle(a, existingArticleId, sourceId));
-        continue;
-      }
-    }
-
-    const publishedAt = a.publishedAt ? new Date(a.publishedAt).toISOString() : null;
-    const articleRow = {
-      sourceId,
-      externalId: a.externalId ?? null,
-      title: a.title,
-      summary: a.summary ?? null,
-      url: a.url ?? null,
-      publishedAt,
-      rawPayload: a.rawPayload ?? null,
-    };
-    const articleRowSnake = {
-      source_id: sourceId,
-      external_id: a.externalId ?? null,
-      title: a.title,
-      summary: a.summary ?? null,
-      url: a.url ?? null,
-      published_at: publishedAt,
-      raw_payload: a.rawPayload ?? null,
-    };
-    let insertRes = await sb.from(ARTICLE_TABLE).insert(articleRow).select("id").single();
-    let newArticle = (insertRes as { data?: unknown }).data;
-    let insertErr: unknown = (insertRes as { error?: unknown }).error;
-    if (insertErr && ARTICLE_TABLE_ALT) {
-      insertRes = await sb.from(ARTICLE_TABLE_ALT).insert(articleRow).select("id").single();
-      newArticle = (insertRes as { data?: unknown }).data;
-      insertErr = (insertRes as { error?: unknown }).error;
-    }
-    const colError = insertErr && (String((insertErr as any)?.message ?? "").includes("column") || String((insertErr as any)?.message ?? "").includes("does not exist"));
-    if (insertErr && colError) {
-      insertRes = await sb.from(ARTICLE_TABLE).insert(articleRowSnake).select("id").single();
-      newArticle = (insertRes as { data?: unknown }).data;
-      insertErr = (insertRes as { error?: unknown }).error;
-      if (insertErr && ARTICLE_TABLE_ALT) {
-        insertRes = await sb.from(ARTICLE_TABLE_ALT).insert(articleRowSnake).select("id").single();
-        newArticle = (insertRes as { data?: unknown }).data;
-        insertErr = (insertRes as { error?: unknown }).error;
-      }
-    }
-    if (insertErr && ARTICLE_TABLE !== "articles") {
-      insertRes = await sb.from("articles").insert(articleRow).select("id").single();
-      newArticle = (insertRes as { data?: unknown }).data;
-      insertErr = (insertRes as { error?: unknown }).error;
-    }
-    if (insertErr || !(newArticle as { id?: string })?.id) {
-      console.error("[data-supabase] insert article failed", (insertErr as { message?: string })?.message ?? insertErr, "table=" + ARTICLE_TABLE);
-      skipped++;
-      continue;
-    }
-    const newId = (newArticle as { id: string }).id;
-    created++;
-    newArticleIds.push(newId);
-    feedEntries.push(toCachedArticle(a, newId, sourceId));
-    await createEventFromArticle({
-      id: newId,
-      title: a.title,
-      summary: a.summary ?? null,
-      url: a.url ?? null,
-      publishedAt: publishedAt ?? undefined,
-    });
   }
 
+  const canProcess = validArticles.filter((a) => sourceIdCache.has(a.sourceSlug ?? slugify(a.sourceName)));
+  skipped += validArticles.length - canProcess.length;
+
+  // ── 2. Batch dedup: one SELECT for all externalIds ──
+  const externalIds = Array.from(new Set(canProcess.map((a) => a.externalId).filter(Boolean) as string[]));
+  const existingSet = new Set<string>(); // externalIds already in DB
+  const existingIdMap = new Map<string, string>(); // externalId → article DB id
+  if (externalIds.length > 0) {
+    const articleTables = [ARTICLE_TABLE, ARTICLE_TABLE_ALT, "articles"].filter(Boolean) as string[];
+    for (const t of articleTables) {
+      const res = await sb.from(t).select("id, externalId").in("externalId", externalIds);
+      if (!res.error && Array.isArray(res.data)) {
+        for (const row of res.data as { id: string; externalId: string }[]) {
+          if (row.externalId) {
+            existingSet.add(row.externalId);
+            existingIdMap.set(row.externalId, row.id);
+          }
+        }
+        break;
+      }
+    }
+  }
+
+  // Partition into existing (skip) vs. new (insert)
+  const toInsert: IngestArticleInput[] = [];
+  for (const a of canProcess) {
+    const sourceId = sourceIdCache.get(a.sourceSlug ?? slugify(a.sourceName))!;
+    if (a.externalId && existingSet.has(a.externalId)) {
+      skipped++;
+      feedEntries.push(toCachedArticle(a, existingIdMap.get(a.externalId)!, sourceId));
+      continue;
+    }
+    toInsert.push(a);
+  }
+
+  // ── 3. Batch insert all new articles in one query ──
+  if (toInsert.length > 0) {
+    const makeRows = (snake: boolean) =>
+      toInsert.map((a) => {
+        const sourceId = sourceIdCache.get(a.sourceSlug ?? slugify(a.sourceName))!;
+        const publishedAt = a.publishedAt ? new Date(a.publishedAt).toISOString() : null;
+        return snake
+          ? { source_id: sourceId, external_id: a.externalId ?? null, title: a.title, summary: a.summary ?? null, url: a.url ?? null, published_at: publishedAt, raw_payload: a.rawPayload ?? null }
+          : { sourceId, externalId: a.externalId ?? null, title: a.title, summary: a.summary ?? null, url: a.url ?? null, publishedAt: publishedAt, rawPayload: a.rawPayload ?? null };
+      });
+
+    const articleTables = [ARTICLE_TABLE, ARTICLE_TABLE_ALT, "articles"].filter(Boolean) as string[];
+    let insertedRows: { id: string; externalId?: string; external_id?: string }[] | null = null;
+    outer: for (const t of articleTables) {
+      for (const snake of [false, true]) {
+        const res = await sb.from(t).insert(makeRows(snake)).select("id, externalId, external_id");
+        if (!res.error && Array.isArray(res.data)) {
+          insertedRows = res.data;
+          break outer;
+        }
+        const msg = String((res.error as any)?.message ?? "");
+        const isColErr = msg.includes("column") || msg.includes("does not exist");
+        if (!isColErr) break; // not a column error — try next table name
+      }
+    }
+
+    // If batch failed, fall back to individual inserts
+    if (!insertedRows) {
+      console.error("[data-supabase] batch insert failed; falling back to per-article inserts");
+      for (const a of toInsert) {
+        const sourceId = sourceIdCache.get(a.sourceSlug ?? slugify(a.sourceName))!;
+        const publishedAt = a.publishedAt ? new Date(a.publishedAt).toISOString() : null;
+        const row = { sourceId, externalId: a.externalId ?? null, title: a.title, summary: a.summary ?? null, url: a.url ?? null, publishedAt, rawPayload: a.rawPayload ?? null };
+        let res = await sb.from(ARTICLE_TABLE).insert(row).select("id").single();
+        if (res.error && ARTICLE_TABLE_ALT) res = await sb.from(ARTICLE_TABLE_ALT).insert(row).select("id").single();
+        if (res.error && ARTICLE_TABLE !== "articles") res = await sb.from("articles").insert(row).select("id").single();
+        if (!res.error && (res.data as any)?.id) {
+          const newId = (res.data as any).id;
+          created++;
+          newArticleIds.push(newId);
+          feedEntries.push(toCachedArticle(a, newId, sourceId));
+          await createEventFromArticle({ id: newId, title: a.title, summary: a.summary ?? null, url: a.url ?? null, publishedAt: publishedAt ?? undefined });
+        } else {
+          skipped++;
+        }
+      }
+    } else {
+      // Correlate inserted rows back to articles via externalId
+      const extIdToArticle = new Map<string, IngestArticleInput>();
+      for (const a of toInsert) if (a.externalId) extIdToArticle.set(a.externalId, a);
+
+      for (const row of insertedRows) {
+        const extId = row.externalId ?? row.external_id ?? null;
+        const a = extId ? extIdToArticle.get(extId) : toInsert.find((x) => !x.externalId);
+        if (!a) continue;
+        const sourceId = sourceIdCache.get(a.sourceSlug ?? slugify(a.sourceName))!;
+        const publishedAt = a.publishedAt ? new Date(a.publishedAt).toISOString() : null;
+        created++;
+        newArticleIds.push(row.id);
+        feedEntries.push(toCachedArticle(a, row.id, sourceId));
+        await createEventFromArticle({ id: row.id, title: a.title, summary: a.summary ?? null, url: a.url ?? null, publishedAt: publishedAt ?? undefined });
+      }
+    }
+  }
+
+  // ── 4. Update feed cache ──
   if (feedEntries.length > 0) {
     setFeedCache(feedEntries);
     const mergeAndSort = (existing: CachedArticle[] | null): CachedArticle[] => {
