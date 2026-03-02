@@ -5,12 +5,29 @@ export type RssFeedConfig = {
 };
 
 // Default curated RSS sources across finance, geopolitics, energy, healthcare, and tech.
+// Note: feeds.reuters.com (businessNews, worldNews, energy, healthNews) often return 502;
+// we use Reuters Best and other working sources for fresh business/energy/health content.
 const defaultFeeds: RssFeedConfig[] = [
   // Markets / Finance
   {
-    url: "https://feeds.reuters.com/reuters/businessNews",
-    sourceName: "Reuters Business",
-    sourceBaseUrl: "https://www.reuters.com",
+    url: "https://reutersbest.com/feed/",
+    sourceName: "Reuters Best",
+    sourceBaseUrl: "https://reutersbest.com",
+  },
+  {
+    url: "https://feeds.content.dowjones.io/public/rss/mw_topstories",
+    sourceName: "MarketWatch Top Stories",
+    sourceBaseUrl: "https://www.marketwatch.com",
+  },
+  {
+    url: "https://feeds.content.dowjones.io/public/rss/mw_realtimeheadlines",
+    sourceName: "MarketWatch Headlines",
+    sourceBaseUrl: "https://www.marketwatch.com",
+  },
+  {
+    url: "https://rss.cnn.com/rss/money_latest.rss",
+    sourceName: "CNN Business",
+    sourceBaseUrl: "https://www.cnn.com",
   },
   {
     url: "https://www.cnbc.com/id/100003114/device/rss/rss.html",
@@ -35,22 +52,12 @@ const defaultFeeds: RssFeedConfig[] = [
     sourceBaseUrl: "https://apnews.com",
   },
   {
-    url: "https://feeds.reuters.com/Reuters/worldNews",
-    sourceName: "Reuters World",
-    sourceBaseUrl: "https://www.reuters.com",
-  },
-  {
     url: "http://feeds.bbci.co.uk/news/world/rss.xml",
     sourceName: "BBC World",
     sourceBaseUrl: "https://www.bbc.com",
   },
 
   // Energy / Oil
-  {
-    url: "https://feeds.reuters.com/reuters/energy",
-    sourceName: "Reuters Energy",
-    sourceBaseUrl: "https://www.reuters.com",
-  },
   {
     url: "https://oilprice.com/rss/main",
     sourceName: "OilPrice.com",
@@ -62,11 +69,6 @@ const defaultFeeds: RssFeedConfig[] = [
     url: "https://www.fda.gov/about-fda/contact-fda/stay-informed/rss-feeds/press-releases",
     sourceName: "FDA Press Releases",
     sourceBaseUrl: "https://www.fda.gov",
-  },
-  {
-    url: "https://feeds.reuters.com/reuters/healthNews",
-    sourceName: "Reuters Health",
-    sourceBaseUrl: "https://www.reuters.com",
   },
 
   // Tech
