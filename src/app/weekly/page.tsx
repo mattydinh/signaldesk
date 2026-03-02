@@ -73,7 +73,10 @@ export default async function WeeklyPage() {
             China geopolitics, US conflict exposure, and investor sector impact.
           </p>
           <p className="mt-2 text-meta text-[#71717A]">
-            Briefs are generated automatically Sundays at 6 PM UTC. If one is missing, generate it below.
+            Briefs are generated once at the end of each week (Sunday 6 PM UTC) and summarize that week&apos;s events. They do not update when new articles are added later.
+          </p>
+          <p className="mt-1 text-meta text-[#71717A]">
+            Next brief: Sunday 6 PM UTC. If the past week&apos;s brief is missing, generate it below.
           </p>
           <div className="mt-4">
             <GenerateBriefButton />

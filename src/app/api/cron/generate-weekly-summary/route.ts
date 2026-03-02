@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { generateWeeklySummary } from "@/lib/weeklySummary";
+import { generateWeeklySummary, getPastWeekStart } from "@/lib/weeklySummary";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -23,18 +23,16 @@ export async function GET(request: NextRequest) {
   }
 
   const now = new Date();
-  const day = now.getUTCDay();
-  const daysSinceSunday = day === 0 ? 7 : day;
-  const lastSunday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - daysSinceSunday, 0, 0, 0, 0));
+  const pastWeekStart = getPastWeekStart(now);
 
   const existing = await prisma.weeklySummary.findUnique({
-    where: { weekStart: lastSunday },
+    where: { weekStart: pastWeekStart },
   });
   if (existing) {
     return NextResponse.json({ ok: true, skipped: "already exists", id: existing.id });
   }
 
-  const result = await generateWeeklySummary(lastSunday);
+  const result = await generateWeeklySummary(pastWeekStart);
   if ("error" in result) {
     return NextResponse.json({ error: result.error }, { status: 500 });
   }

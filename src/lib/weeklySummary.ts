@@ -16,6 +16,21 @@ const THEME_KEYWORDS = [
 const MAX_ARTICLES_FOR_PROMPT = 80;
 const MAX_CHARS_FOR_PROMPT = 95_000;
 
+/**
+ * Returns the Sunday 00:00 UTC that started the week that just ended (past week).
+ * We only generate briefs for the past week so we never create a partial-week summary.
+ */
+export function getPastWeekStart(now: Date): Date {
+  const y = now.getUTCFullYear();
+  const m = now.getUTCMonth();
+  const d = now.getUTCDate();
+  const day = now.getUTCDay();
+  const currentWeekStart = new Date(Date.UTC(y, m, d - day, 0, 0, 0, 0));
+  const pastWeekStart = new Date(currentWeekStart);
+  pastWeekStart.setUTCDate(pastWeekStart.getUTCDate() - 7);
+  return pastWeekStart;
+}
+
 type ArticleSnippet = {
   title: string;
   summary: string | null;

@@ -1,11 +1,11 @@
 "use server";
 
 import { prisma } from "@/lib/db";
-import { generateWeeklySummary } from "@/lib/weeklySummary";
+import { generateWeeklySummary, getPastWeekStart } from "@/lib/weeklySummary";
 
 /**
- * Generate the weekly brief for the week that just ended (same week as cron).
- * Call from the Weekly page to create the brief if the cron didn't run or failed.
+ * Generate the weekly brief for the week that just ended (past week only).
+ * We never generate for the current week so the brief is always a full week's summary.
  */
 export async function generateWeeklyBriefAction(): Promise<{
   ok: boolean;
@@ -15,20 +15,16 @@ export async function generateWeeklyBriefAction(): Promise<{
 }> {
   try {
     const now = new Date();
-    const day = now.getUTCDay();
-    const daysSinceSunday = day === 0 ? 7 : day;
-    const lastSunday = new Date(
-      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - daysSinceSunday, 0, 0, 0, 0)
-    );
+    const pastWeekStart = getPastWeekStart(now);
 
     const existing = await prisma.weeklySummary.findUnique({
-      where: { weekStart: lastSunday },
+      where: { weekStart: pastWeekStart },
     });
     if (existing) {
       return { ok: true, skipped: true, id: existing.id };
     }
 
-    const result = await generateWeeklySummary(lastSunday);
+    const result = await generateWeeklySummary(pastWeekStart);
     if ("error" in result) {
       return { ok: false, error: result.error };
     }
