@@ -2,9 +2,10 @@ import Link from "next/link";
 import Image from "next/image";
 import { prisma } from "@/lib/db";
 import GenerateBriefButton from "./GenerateBriefButton";
+import RemoveBriefButton from "./RemoveBriefButton";
 
 export const dynamic = "force-dynamic";
-export const revalidate = 60;
+export const revalidate = 0;
 
 function formatWeekRange(weekStart: Date, weekEnd: Date): string {
   const start = new Date(weekStart);
@@ -131,12 +132,15 @@ export default async function WeeklyPage() {
                         ))}
                       </ul>
                     )}
-                    <Link
-                      href={`/weekly/${s.id}`}
-                      className="mt-2 inline-flex w-fit rounded-badge border border-[#27272A] bg-[#18181B] px-4 py-2 text-body font-medium text-foreground hover:bg-[#27272A] focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background transition-colors duration-150"
-                    >
-                      View Full Brief
-                    </Link>
+                    <div className="mt-2 flex flex-wrap items-center gap-3">
+                      <Link
+                        href={`/weekly/${s.id}`}
+                        className="inline-flex w-fit rounded-badge border border-[#27272A] bg-[#18181B] px-4 py-2 text-body font-medium text-foreground hover:bg-[#27272A] focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background transition-colors duration-150"
+                      >
+                        View Full Brief
+                      </Link>
+                      <RemoveBriefButton id={s.id} />
+                    </div>
                   </div>
                 </li>
               );
