@@ -37,13 +37,14 @@ export async function getSourcesSupabase(): Promise<SourceRow[]> {
   const supabase = getSupabaseAdmin();
   if (!supabase) return [];
   const sb = supabase as any;
+  type Err = { message?: string; code?: string } | null;
   let result = await sb.from(SOURCE_TABLE).select("id, name, slug").order("name", { ascending: true });
   let data = (result as { data?: unknown }).data;
-  let error = (result as { error?: { message?: string; code?: string } }).error;
+  let error: Err = (result as { error?: Err }).error ?? null;
   if (error && SOURCE_TABLE_ALT) {
     result = await sb.from(SOURCE_TABLE_ALT).select("id, name, slug").order("name", { ascending: true });
     data = (result as { data?: unknown }).data;
-    error = (result as { error?: unknown }).error;
+    error = (result as { error?: Err }).error ?? null;
   }
   if (error) {
     console.error("[data-supabase] getSources", error?.message ?? error, error?.code);
@@ -336,7 +337,7 @@ export async function ingestArticlesSupabase(
         insertSourceErr = (insertSourceRes as { error?: unknown }).error;
       }
       if (insertSourceErr || !(newSource as { id?: string })?.id) {
-        console.error("[data-supabase] insert source failed", insertSourceErr?.message ?? insertSourceErr, "table=" + SOURCE_TABLE);
+        console.error("[data-supabase] insert source failed", (insertSourceErr as { message?: string })?.message ?? insertSourceErr, "table=" + SOURCE_TABLE);
         skipped++;
         continue;
       }
@@ -379,7 +380,7 @@ export async function ingestArticlesSupabase(
     };
     let insertRes = await sb.from(ARTICLE_TABLE).insert(articleRow).select("id").single();
     let newArticle = (insertRes as { data?: unknown }).data;
-    let insertErr = (insertRes as { error?: { message?: string; code?: string } }).error;
+    let insertErr: unknown = (insertRes as { error?: unknown }).error;
     if (insertErr && ARTICLE_TABLE_ALT) {
       insertRes = await sb.from(ARTICLE_TABLE_ALT).insert(articleRow).select("id").single();
       newArticle = (insertRes as { data?: unknown }).data;
@@ -397,7 +398,7 @@ export async function ingestArticlesSupabase(
       }
     }
     if (insertErr || !(newArticle as { id?: string })?.id) {
-      console.error("[data-supabase] insert article failed", (insertErr as any)?.message ?? insertErr, "table=" + ARTICLE_TABLE);
+      console.error("[data-supabase] insert article failed", (insertErr as { message?: string })?.message ?? insertErr, "table=" + ARTICLE_TABLE);
       skipped++;
       continue;
     }
