@@ -29,6 +29,9 @@ const SIGNAL_COLORS: Record<string, string> = {
   EnergySentiment: "#5eead4",
   OilNewsVolume: "#fbbf24",
   HealthcareSentiment: "#5eead4",
+  PharmaCompositeSignal: "#a78bfa",
+  PharmaPriceMomentum: "#a78bfa",
+  HealthcareVolume: "#67e8f9",
 };
 
 export default function SignalChart({ signals }: { signals: SignalPoint[] }) {

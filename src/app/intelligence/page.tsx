@@ -2,6 +2,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/db";
 import SignalChart from "./SignalChart";
 import PopulateButton from "./PopulateButton";
+import SectorCompositesView from "./SectorCompositesView";
 import { runPipeline } from "@/lib/pipeline/run";
 import { formatDbError } from "@/lib/format-db-error";
 
@@ -55,6 +56,15 @@ const OIL_COMPONENT_SIGNALS = [
 ] as const;
 const OIL_COMPOSITE_NAME = "OilCompositeSignal";
 
+const PHARMA_COMPOSITE_NAME = "PharmaCompositeSignal";
+const PHARMA_COMPONENT_SIGNALS = ["HealthcareSentiment", "HealthcareVolume", "PharmaPriceMomentum"] as const;
+
+/** Sector composites shown in Core Signals. */
+const SECTOR_COMPOSITES = [
+  { id: "oil", label: "Oil & Gas", compositeName: OIL_COMPOSITE_NAME, componentSignals: [...OIL_COMPONENT_SIGNALS] },
+  { id: "pharma", label: "Pharma", compositeName: PHARMA_COMPOSITE_NAME, componentSignals: [...PHARMA_COMPONENT_SIGNALS] },
+] as const;
+
 async function getLatestOilComponents() {
   try {
     const since = new Date();
@@ -103,6 +113,59 @@ async function getOilBacktestResults() {
   }
 }
 
+async function getLatestPharmaComponents() {
+  try {
+    const since = new Date();
+    since.setDate(since.getDate() - 7);
+    const rows = await prisma.derivedSignal.findMany({
+      where: {
+        signalName: {
+          in: [...PHARMA_COMPONENT_SIGNALS, PHARMA_COMPOSITE_NAME],
+        },
+        date: { gte: since },
+      },
+      orderBy: { date: "desc" },
+    });
+    const byName = new Map<string, { zscore: number; date: Date }>();
+    for (const r of rows) {
+      if (!byName.has(r.signalName))
+        byName.set(r.signalName, { zscore: r.zscore, date: r.date });
+    }
+    return byName;
+  } catch {
+    return new Map();
+  }
+}
+
+async function getPharmaCompositeSeries(days = 90) {
+  try {
+    const since = new Date();
+    since.setDate(since.getDate() - days);
+    const signals = await prisma.derivedSignal.findMany({
+      where: { signalName: PHARMA_COMPOSITE_NAME, date: { gte: since } },
+      orderBy: { date: "asc" },
+    });
+    return signals;
+  } catch {
+    return [];
+  }
+}
+
+async function getPharmaBacktestResults() {
+  try {
+    const results = await prisma.backtestResult.findMany({
+      where: {
+        signalName: PHARMA_COMPOSITE_NAME,
+        ticker: { in: ["XLV", "SPY"] },
+      },
+      orderBy: { endDate: "desc" },
+    });
+    return results;
+  } catch {
+    return [];
+  }
+}
+
 const REGIME_TOOLTIPS: Record<string, string> = {
   "Risk-On": "Investors are increasing exposure to equities and higher-risk assets.",
   "Risk-Off": "Investors are rotating into defensive assets (bonds, gold, cash).",
@@ -118,13 +181,26 @@ function regimeBadgeClass(regime: string): string {
 }
 
 export default async function IntelligencePage() {
-  let [regime, signals, backtestResults, oilComponents, oilCompositeSeries, oilBacktests] = await Promise.all([
+  let [
+    regime,
+    signals,
+    backtestResults,
+    oilComponents,
+    oilCompositeSeries,
+    oilBacktests,
+    pharmaComponents,
+    pharmaCompositeSeries,
+    pharmaBacktests,
+  ] = await Promise.all([
     getLatestRegime(),
     getRecentSignals(),
     getLatestBacktestResults(),
     getLatestOilComponents(),
     getOilCompositeSeries(),
     getOilBacktestResults(),
+    getLatestPharmaComponents(),
+    getPharmaCompositeSeries(),
+    getPharmaBacktestResults(),
   ]);
 
   const hasData = regime != null || signals.length > 0 || backtestResults.length > 0;
@@ -136,13 +212,26 @@ export default async function IntelligencePage() {
   if (!hasData && !isBuild) {
     try {
       await runPipeline();
-      [regime, signals, backtestResults, oilComponents, oilCompositeSeries, oilBacktests] = await Promise.all([
+      [
+        regime,
+        signals,
+        backtestResults,
+        oilComponents,
+        oilCompositeSeries,
+        oilBacktests,
+        pharmaComponents,
+        pharmaCompositeSeries,
+        pharmaBacktests,
+      ] = await Promise.all([
         getLatestRegime(),
         getRecentSignals(),
         getLatestBacktestResults(),
         getLatestOilComponents(),
         getOilCompositeSeries(),
         getOilBacktestResults(),
+        getLatestPharmaComponents(),
+        getPharmaCompositeSeries(),
+        getPharmaBacktestResults(),
       ]);
     } catch (e) {
       console.error("[intelligence] pipeline run failed", e);
@@ -153,6 +242,52 @@ export default async function IntelligencePage() {
 
   const hasDataNow = regime != null || signals.length > 0 || backtestResults.length > 0;
   const oilZ = oilComponents.get(OIL_COMPOSITE_NAME)?.zscore ?? null;
+  const pharmaZ = pharmaComponents.get(PHARMA_COMPOSITE_NAME)?.zscore ?? null;
+
+  const sectorCompositeData: Record<string, Parameters<typeof SectorCompositesView>[0]["dataBySector"][string]> = {
+    oil: {
+      latestZ: oilZ,
+      components: Object.fromEntries(
+        OIL_COMPONENT_SIGNALS.map((name) => [name, oilComponents.get(name)?.zscore])
+      ),
+      componentSignals: [...OIL_COMPONENT_SIGNALS],
+      series: oilCompositeSeries.map((s) => ({
+        date: s.date.toISOString().slice(0, 10),
+        signalName: s.signalName,
+        zscore: s.zscore,
+      })),
+      backtests: oilBacktests.map((r) => ({
+        ticker: r.ticker,
+        sharpe: Number(r.sharpe),
+        maxDrawdown: Number(r.maxDrawdown),
+        annualizedReturn: r.annualizedReturn != null ? Number(r.annualizedReturn) : null,
+        hitRate: r.hitRate != null ? Number(r.hitRate) : null,
+        endDate: r.endDate,
+      })),
+    },
+    pharma: {
+      latestZ: pharmaZ,
+      components: Object.fromEntries(
+        PHARMA_COMPONENT_SIGNALS.map((name) => [name, pharmaComponents.get(name)?.zscore])
+      ),
+      componentSignals: [...PHARMA_COMPONENT_SIGNALS],
+      series: pharmaCompositeSeries.map((s) => ({
+        date: s.date.toISOString().slice(0, 10),
+        signalName: s.signalName,
+        zscore: s.zscore,
+      })),
+      backtests: pharmaBacktests.map((r) => ({
+        ticker: r.ticker,
+        sharpe: Number(r.sharpe),
+        maxDrawdown: Number(r.maxDrawdown),
+        annualizedReturn: r.annualizedReturn != null ? Number(r.annualizedReturn) : null,
+        hitRate: r.hitRate != null ? Number(r.hitRate) : null,
+        endDate: r.endDate,
+      })),
+    },
+  };
+
+  const hasAnySectorData = oilZ != null || pharmaZ != null;
 
   return (
     <div className="min-h-screen gradient-mesh">
@@ -254,6 +389,12 @@ export default async function IntelligencePage() {
               </p>
             </div>
             <div>
+              <h3 className="text-foreground font-medium mb-1">Sector composites</h3>
+              <p className="mb-2">
+                <strong className="text-foreground">Oil & Gas</strong> and <strong className="text-foreground">Pharma</strong> are composite z-scores built from price momentum (WTI/XLV), sector sentiment, and sector volume. Select a sector in Core Signals to see gauge, component breakdown, chart, and backtest vs sector ETFs (USO, XLE, XLV) and SPY.
+              </p>
+            </div>
+            <div>
               <h3 className="text-foreground font-medium mb-1">Signal Performance</h3>
               <p>
                 A <strong className="text-foreground">backtest</strong>: we simulate trading SPY (S&P 500) using only this signal—long when z &gt; 1, short when z &lt; -1, flat otherwise—over the last 90 days. <strong className="text-foreground">Sharpe</strong> = risk-adjusted return (higher is better). <strong className="text-foreground">Max DD</strong> = largest peak-to-trough drop (lower is better). For context only, not investment advice; results depend on having market price data in the pipeline.
@@ -300,99 +441,12 @@ export default async function IntelligencePage() {
           </div>
         </section>
 
-        {/* Oil & Gas */}
-        <section className="mb-16" aria-label="Oil & Gas">
-          <div className="glass-card rounded-card border border-[#27272A] p-8">
-            <h2 className="text-section-header text-foreground mb-1">Oil & Gas</h2>
-            <p className="text-meta text-[#71717A] mb-4">
-              Composite from price momentum (30d), Energy sentiment, volume, EIA inventory shock, and rig trend. Gauge and backtest vs USO, XLE, SPY.
-            </p>
-            {oilZ != null ? (
-              <>
-                <div className="mb-4">
-                  <p className="text-meta text-[#71717A] mb-2">Composite z-score (latest)</p>
-                  <div className="h-3 w-full max-w-md rounded-pill bg-[#27272A] overflow-hidden flex">
-                    <div
-                      className="h-full rounded-pill transition-all"
-                      style={{
-                        width: `${Math.min(100, Math.max(0, ((oilZ + 3) / 6) * 100))}%`,
-                        backgroundColor: oilZ >= 1 ? "#34D399" : oilZ <= -1 ? "#F87171" : "#71717A",
-                      }}
-                    />
-                  </div>
-                  <p className="text-body text-foreground mt-1">
-                    {oilZ <= -2 ? "Strong Bearish" : oilZ <= -1 ? "Bearish" : oilZ < 1 ? "Neutral" : oilZ < 2 ? "Bullish" : "Strong Bullish"} ({oilZ.toFixed(2)})
-                  </p>
-                </div>
-                <div className="overflow-x-auto rounded-card border border-[#27272A] mb-6">
-                  <table className="w-full text-body">
-                    <thead>
-                      <tr className="border-b border-[#27272A] bg-[#18181B]/40">
-                        <th className="px-4 py-3 text-left font-medium text-foreground">Component</th>
-                        <th className="px-4 py-3 text-right font-medium text-foreground">z-score</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {OIL_COMPONENT_SIGNALS.map((name) => (
-                        <tr key={name} className="border-b border-[#27272A]/60">
-                          <td className="px-4 py-3 text-foreground">{name}</td>
-                          <td className="px-4 py-3 text-right text-[#A1A1AA]">
-                            {oilComponents.get(name) != null ? oilComponents.get(name)!.zscore.toFixed(2) : "—"}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                {oilCompositeSeries.length > 0 && (
-                  <div className="mb-6">
-                    <p className="text-meta text-[#71717A] mb-2">Oil composite z over time</p>
-                    <SignalChart
-                      signals={oilCompositeSeries.map((s) => ({
-                        date: s.date.toISOString().slice(0, 10),
-                        signalName: s.signalName,
-                        zscore: s.zscore,
-                      }))}
-                    />
-                  </div>
-                )}
-                {oilBacktests.length > 0 && (
-                  <div>
-                    <p className="text-meta text-[#71717A] mb-2">Backtest: OilCompositeSignal vs tickers</p>
-                    <ul className="space-y-2 text-body text-[#A1A1AA]">
-                      {oilBacktests.map((r) => {
-                        const sharpe = Number(r.sharpe);
-                        const maxDd = Number(r.maxDrawdown);
-                        const annRet = Number(r.annualizedReturn ?? 0);
-                        const hitRate = Number(r.hitRate ?? 0);
-                        const endStr = r.endDate ? r.endDate.toISOString().slice(0, 10) : r.ticker;
-                        return (
-                          <li key={`${r.ticker}-${endStr}`}>
-                            {r.ticker}: Sharpe {Number.isFinite(sharpe) ? sharpe.toFixed(2) : "—"}, Max DD {Number.isFinite(maxDd) ? (maxDd * 100).toFixed(1) : "—"}%, Ann return {Number.isFinite(annRet) ? (annRet * 100).toFixed(1) : "—"}%, Hit rate {Number.isFinite(hitRate) ? (hitRate * 100).toFixed(0) : "—"}%
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  </div>
-                )}
-              </>
-            ) : (
-              <div className="space-y-3">
-                <p className="text-body text-[#71717A]">
-                  No oil composite data yet. Run the pipeline (part 1 + part 2) so derived signals and oil signals are computed.
-                </p>
-                <PopulateButton />
-              </div>
-            )}
-          </div>
-        </section>
-
-        {/* Signal Chart */}
+        {/* Core Signals: topic signals + sector composites */}
         <section className="mb-16" aria-label="Core signals">
           <div className="glass-card rounded-card border border-[#27272A] p-8">
             <h2 className="text-section-header text-foreground mb-4">Core Signals</h2>
             <p className="text-meta text-[#71717A] mb-4">
-              Pick a signal to see its z-score over time. <strong className="text-[#A1A1AA]">z &gt; 1</strong> = unusually high vs last 60 days; <strong className="text-[#A1A1AA]">z &lt; -1</strong> = unusually low; <strong className="text-[#A1A1AA]">-1 to 1</strong> = normal range. Example: Technology Volume z = 0.71 means tech news volume is moderately above its recent average.
+              Topic-level signals (sentiment and volume by category) and sector composites (Oil & Gas, Pharma). Pick a topic signal to see z-score over time; select a sector for gauge, components, chart, and backtest. <strong className="text-[#A1A1AA]">z &gt; 1</strong> = unusually high vs last 60 days; <strong className="text-[#A1A1AA]">z &lt; -1</strong> = unusually low.
             </p>
             {signals.length > 0 ? (
               <SignalChart
@@ -407,6 +461,10 @@ export default async function IntelligencePage() {
                 No derived signals yet. Signals come from ingested articles (events). Use Dashboard → Fetch news, then run the pipeline.
               </p>
             )}
+            <SectorCompositesView
+              sectors={SECTOR_COMPOSITES.map((s) => ({ id: s.id, label: s.label, compositeName: s.compositeName }))}
+              dataBySector={sectorCompositeData}
+            />
           </div>
         </section>
 
@@ -433,11 +491,11 @@ export default async function IntelligencePage() {
           </div>
         </section>
 
-        {(!hasDataNow || oilZ == null) && (
+        {(!hasDataNow || !hasAnySectorData) && (
           <div className="space-y-4 rounded-card border border-[#27272A] bg-[#18181B]/60 p-6">
             <p className="text-body text-[#A1A1AA]">
               {hasDataNow
-                ? "Run the pipeline to fill in the oil composite and any other missing data."
+                ? "Run the pipeline to fill in sector composites and any other missing data."
                 : "Intelligence data comes from the ML pipeline (events → signals → regime → backtest). That pipeline runs automatically after you "}
               {!hasDataNow && (
                 <>

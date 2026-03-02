@@ -16,6 +16,8 @@ const SIGNAL_DEFS: { name: string; topic: string; useVolume: boolean; useSentime
   { name: "WarConflictVolume", topic: "War & Conflict", useVolume: true, useSentiment: false },
   { name: "EnergySentiment", topic: "Energy", useVolume: false, useSentiment: true },
   { name: "OilNewsVolume", topic: "Energy", useVolume: true, useSentiment: false },
+  { name: "HealthcareSentiment", topic: "Healthcare", useVolume: false, useSentiment: true },
+  { name: "HealthcareVolume", topic: "Healthcare", useVolume: true, useSentiment: false },
 ];
 
 function zscoreClip(val: number): number {

@@ -3,7 +3,7 @@
  */
 import { prisma } from "@/lib/db";
 
-const TICKERS = ["SPY", "QQQ", "XLK", "XLF", "VNQ", "GLD", "USO", "XLE", "CL=F"] as const;
+const TICKERS = ["SPY", "QQQ", "XLK", "XLF", "VNQ", "GLD", "USO", "XLE", "CL=F", "XLV"] as const;
 
 type HistoricalRow = { date: Date; open: number; high: number; low: number; close: number; volume: number };
 

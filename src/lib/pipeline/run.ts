@@ -6,6 +6,7 @@ import { runEventFeatures } from "@/lib/pipeline/event-features";
 import { runDailyTopicMetrics } from "@/lib/pipeline/daily-topic-metrics";
 import { runDerivedSignals } from "@/lib/pipeline/derived-signals";
 import { runOilSignals } from "@/lib/pipeline/oil-signals";
+import { runPharmaSignals } from "@/lib/pipeline/pharma-signals";
 import { runMarketPrices } from "@/lib/pipeline/market-prices";
 import { runRegime } from "@/lib/pipeline/regime";
 import { runBacktest } from "@/lib/pipeline/backtest";
@@ -17,6 +18,7 @@ export async function runPipelinePart1(): Promise<Record<string, unknown>> {
   results.daily_topic_metrics = await runDailyTopicMetrics(90);
   results.derived_signals = await runDerivedSignals(90);
   results.oil_signals = await runOilSignals(90);
+  results.pharma_signals = await runPharmaSignals(90);
   return results;
 }
 
@@ -33,6 +35,12 @@ export async function runPipelinePart2(): Promise<Record<string, unknown>> {
   for (const ticker of oilTickers) {
     await runBacktest("OilCompositeSignal", ticker).catch((e) =>
       console.error("[run-pipeline] backtest OilCompositeSignal", ticker, e)
+    );
+  }
+  const pharmaTickers = ["XLV", "SPY"];
+  for (const ticker of pharmaTickers) {
+    await runBacktest("PharmaCompositeSignal", ticker).catch((e) =>
+      console.error("[run-pipeline] backtest PharmaCompositeSignal", ticker, e)
     );
   }
   results.backtest = "ok";

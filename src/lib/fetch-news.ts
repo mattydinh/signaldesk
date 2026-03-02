@@ -19,8 +19,30 @@ export async function fetchAndIngestNews(): Promise<FetchNewsResult> {
   }
 
   const categories = ["business", "general"] as const;
+  /** Sector "everything" queries to get more pharma/energy articles for signals. */
+  const sectorQueries = [
+    { q: "FDA drug approval pharma", label: "pharma" },
+    { q: "oil OPEC energy crude", label: "energy" },
+  ] as const;
   const allArticles: IngestArticle[] = [];
   const seen = new Set<string>();
+
+  function pushArticle(a: { source?: { id?: string; name?: string }; title?: string; description?: string; url?: string; publishedAt?: string }) {
+    if (!a.title) return;
+    const dedupe = `${a.source?.id ?? "unknown"}-${a.title}`;
+    if (seen.has(dedupe)) return;
+    seen.add(dedupe);
+    allArticles.push({
+      externalId: a.url ?? undefined,
+      sourceName: a.source?.name ?? "Unknown",
+      sourceSlug: a.source?.id ?? undefined,
+      title: a.title,
+      summary: a.description ?? undefined,
+      url: a.url ?? undefined,
+      publishedAt: a.publishedAt ?? undefined,
+      rawPayload: a,
+    });
+  }
 
   try {
     for (const category of categories) {
@@ -35,22 +57,16 @@ export async function fetchAndIngestNews(): Promise<FetchNewsResult> {
       const data = raw;
       if (data.status !== "ok" || !Array.isArray(data.articles)) continue;
 
-      for (const a of data.articles) {
-        if (!a.title) continue;
-        const dedupe = `${a.source?.id ?? "unknown"}-${a.title}`;
-        if (seen.has(dedupe)) continue;
-        seen.add(dedupe);
-        allArticles.push({
-          externalId: a.url ?? undefined,
-          sourceName: a.source?.name ?? "Unknown",
-          sourceSlug: a.source?.id ?? undefined,
-          title: a.title,
-          summary: a.description ?? undefined,
-          url: a.url ?? undefined,
-          publishedAt: a.publishedAt ?? undefined,
-          rawPayload: a,
-        });
-      }
+      for (const a of data.articles) pushArticle(a);
+    }
+
+    for (const { q } of sectorQueries) {
+      const url = `https://newsapi.org/v2/everything?q=${encodeURIComponent(q)}&language=en&sortBy=publishedAt&pageSize=15&apiKey=${newsApiKey}`;
+      const res = await fetch(url, { cache: "no-store" });
+      if (!res.ok) continue;
+      const raw = await res.json() as { status: string; articles?: Array<{ source?: { id?: string; name?: string }; title?: string; description?: string; url?: string; publishedAt?: string }> };
+      if (raw.status !== "ok" || !Array.isArray(raw.articles)) continue;
+      for (const a of raw.articles) pushArticle(a);
     }
   } catch (e) {
     const message = e instanceof Error ? e.message : "Failed to fetch from News API.";
