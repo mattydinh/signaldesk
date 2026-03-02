@@ -85,14 +85,15 @@ function fallbackExternalId(
   sourceSlug: string,
   title: string,
   publishedAt: string | undefined,
-  guid: string | undefined
+  guid: string | undefined,
+  linkOrIndex?: string | number
 ): string {
   if (guid && typeof guid === "string" && guid.trim().length > 0) {
     const g = guid.trim();
     if (g.startsWith("http") && !g.includes("/feed") && !g.endsWith(".xml")) return normalizeArticleUrl(g);
   }
   const datePart = publishedAt ? publishedAt.slice(0, 10) : "";
-  const key = `${sourceSlug}|${title.trim().toLowerCase().slice(0, 200)}|${datePart}`;
+  const key = `${sourceSlug}|${title.trim().toLowerCase().slice(0, 200)}|${datePart}|${linkOrIndex ?? ""}`;
   let h = 0;
   for (let i = 0; i < key.length; i++) h = (Math.imul(31, h) + key.charCodeAt(i)) | 0;
   return `gen:${sourceSlug}:${datePart}:${Math.abs(h).toString(36)}`;
@@ -122,9 +123,9 @@ export async function fetchRssFeed(feed: RssFeedConfig): Promise<IngestArticle[]
     const sourceSlug = slugify(feed.sourceName);
     const articles: IngestArticle[] = [];
     const seenExternalIdsInFeed = new Set<string>();
-    for (const item of items) {
+    items.forEach((item, index) => {
       const title = typeof item.title === "string" ? item.title.trim() : "";
-      if (!title) continue;
+      if (!title) return;
       const link = getLink(item);
       const guid =
         typeof item.guid === "string"
@@ -143,13 +144,13 @@ export async function fetchRssFeed(feed: RssFeedConfig): Promise<IngestArticle[]
       if (useLinkAsId) {
         const normalized = normalizeArticleUrl(link!);
         if (seenExternalIdsInFeed.has(normalized)) {
-          externalId = fallbackExternalId(sourceSlug, title, publishedAt, guid);
+          externalId = fallbackExternalId(sourceSlug, title, publishedAt, guid, index);
         } else {
           seenExternalIdsInFeed.add(normalized);
           externalId = normalized;
         }
       } else {
-        externalId = fallbackExternalId(sourceSlug, title, publishedAt, guid);
+        externalId = fallbackExternalId(sourceSlug, title, publishedAt, guid, index);
       }
       articles.push({
         externalId,
@@ -162,7 +163,7 @@ export async function fetchRssFeed(feed: RssFeedConfig): Promise<IngestArticle[]
         publishedAt,
         rawPayload: item,
       });
-    }
+    });
     return articles;
   } catch (e) {
     console.error("[fetch-rss] error", feed.url, e);
@@ -194,6 +195,19 @@ export async function fetchAllRssArticles(): Promise<IngestArticle[]> {
     if (seen.has(dedupeKey)) continue;
     seen.add(dedupeKey);
     deduped.push(a);
+  }
+
+  // Guarantee unique (sourceSlug, externalId) so ingest never skips new articles as "already in feed".
+  const seenKey = new Map<string, number>();
+  for (const a of deduped) {
+    const slug = a.sourceSlug ?? slugify(a.sourceName);
+    const key = `${slug}:${a.externalId ?? ""}`;
+    const count = (seenKey.get(key) ?? 0) + 1;
+    seenKey.set(key, count);
+    if (count > 1) {
+      const stableSuffix = `#${count}-${(a.title + (a.url ?? "") + (a.publishedAt ?? "")).slice(0, 80).split("").reduce((h, c) => (Math.imul(31, h) + c.charCodeAt(0)) | 0, 0).toString(36)}`;
+      a.externalId = (a.externalId ?? "gen") + stableSuffix;
+    }
   }
 
   return deduped;
