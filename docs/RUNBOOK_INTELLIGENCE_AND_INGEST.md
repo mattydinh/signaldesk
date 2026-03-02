@@ -31,24 +31,26 @@ Intelligence page
 **Fix (one-time backfill + pipeline):**
 
 1. Deploy the `backfill-events` cron if not already deployed (see repo).
-2. Call the backfill **with** pipeline run so Events are created and the pipeline runs in one go:
-
-   ```bash
-   curl -sS "https://YOUR_APP.vercel.app/api/cron/backfill-events?secret=YOUR_CRON_SECRET&runPipeline=1"
-   ```
-
-   This will:
-   - Create one **Event** row per existing article in Supabase (that doesn’t already have an Event).
-   - Run the full ML pipeline (event features → topic metrics → signals → market prices → regime → backtest).
-
+2. **Run two requests** (Vercel has a ~60s function limit; backfill + pipeline together can timeout):
+   - **Step 1 – backfill Events only:**
+     ```bash
+     curl -sS "https://YOUR_APP.vercel.app/api/cron/backfill-events?secret=YOUR_CRON_SECRET"
+     ```
+     Wait for `{"ok":true,"backfilled":N,...}`.
+   - **Step 2 – run the pipeline** (Vercel has a 60s function limit; run in two parts to avoid timeout):
+     ```bash
+     curl -sS "https://YOUR_APP.vercel.app/api/cron/run-pipeline?secret=YOUR_CRON_SECRET&part=1"
+     ```
+     Wait for JSON, then:
+     ```bash
+     curl -sS "https://YOUR_APP.vercel.app/api/cron/run-pipeline?secret=YOUR_CRON_SECRET&part=2"
+     ```
+     Wait for `{"ok":true,"results":{...}}`.
 3. Refresh the **Intelligence** page; regime, signals, and performance should appear.
 
-**Without the query param:**  
-`/api/cron/backfill-events?secret=...` only backfills Events. Then run the pipeline separately:
+**If you hit `FUNCTION_INVOCATION_TIMEOUT`:** Use `&part=1` then `&part=2` as above. Without `part`, the full pipeline runs in one request and may exceed 60s.
 
-```bash
-curl -sS "https://YOUR_APP.vercel.app/api/cron/run-pipeline?secret=YOUR_CRON_SECRET"
-```
+**Note:** `?runPipeline=1` on backfill-events runs the pipeline in the same request; on Vercel Hobby/free tier this often hits `FUNCTION_INVOCATION_TIMEOUT`. Prefer backfill + pipeline part=1 + part=2.
 
 ---
 
@@ -101,7 +103,9 @@ curl -sS "https://YOUR_APP.vercel.app/api/cron/run-pipeline?secret=YOUR_CRON_SEC
 | `GET /api/cron/ingest-news?secret=...` | Fetch news from News API, ingest into Supabase + Blob, create Events for new articles, then run pipeline. |
 | `GET /api/cron/backfill-events?secret=...` | Create Event rows for existing articles that don’t have one. |
 | `GET /api/cron/backfill-events?secret=...&runPipeline=1` | Same as above, then run the full ML pipeline (fixes Intelligence in one call). |
-| `GET /api/cron/run-pipeline?secret=...` | Run the ML pipeline only (event features → signals → regime → backtest). |
+| `GET /api/cron/run-pipeline?secret=...` | Run the full ML pipeline (may timeout on Vercel 60s limit). |
+| `GET /api/cron/run-pipeline?secret=...&part=1` | Pipeline part 1: event features → topic metrics → derived signals. |
+| `GET /api/cron/run-pipeline?secret=...&part=2` | Pipeline part 2: market prices → regime → backtest. Use after part=1 to avoid timeout. |
 
 ---
 

@@ -1,10 +1,12 @@
 /**
  * GET /api/cron/run-pipeline
- * Runs the ML pipeline in order: event_features → daily_topic_metrics → derived_signals → market_prices → regime → backtest.
- * Secure with CRON_SECRET or Authorization header.
+ * Runs the ML pipeline. On Vercel (60s limit) use ?part=1 then ?part=2 to avoid FUNCTION_INVOCATION_TIMEOUT.
+ * - part=1: event_features → daily_topic_metrics → derived_signals
+ * - part=2: market_prices → regime → backtest
+ * - no part: full pipeline (may timeout with many events).
  */
 import { NextRequest, NextResponse } from "next/server";
-import { runPipeline } from "@/lib/pipeline/run";
+import { runPipeline, runPipelinePart1, runPipelinePart2 } from "@/lib/pipeline/run";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -22,8 +24,15 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const part = request.nextUrl.searchParams.get("part");
+
   try {
-    const results = await runPipeline();
+    const results =
+      part === "1"
+        ? await runPipelinePart1()
+        : part === "2"
+          ? await runPipelinePart2()
+          : await runPipeline();
     return NextResponse.json({ ok: true, results });
   } catch (e) {
     console.error("[run-pipeline]", e);
