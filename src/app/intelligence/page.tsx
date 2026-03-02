@@ -138,6 +138,45 @@ export default async function IntelligencePage() {
           </p>
         </section>
 
+        {/* How it works */}
+        <section className="mb-16 rounded-card border border-[#27272A] bg-[#18181B]/40 p-6" aria-label="How these metrics work">
+          <h2 className="text-section-header text-foreground mb-4">How this works</h2>
+          <div className="space-y-6 text-body text-[#A1A1AA]">
+            <div>
+              <h3 className="text-foreground font-medium mb-1">What the ML pipeline does</h3>
+              <p className="mb-2">
+                Every article you ingest becomes an <strong className="text-foreground">event</strong>. We run lightweight <strong className="text-foreground">NLP</strong> on each article’s text: we count positive vs negative words for <strong className="text-foreground">sentiment</strong>, and we score how much the text mentions regulation (e.g. SEC, Fed, court) and geopolitics (e.g. China, sanctions, elections) on a 0–1 scale. We then group articles by <strong className="text-foreground">topic</strong> (Markets, Finance, Technology, Geopolitics, Regulation, War & Conflict, etc.) and by <strong className="text-foreground">date</strong>, and for each topic each day we get: how many articles (volume) and the average sentiment. Finally we compare each topic’s daily value to its own last 60 days and express that as a <strong className="text-foreground">z-score</strong>—how many standard deviations above or below that topic’s recent norm. No external AI APIs: everything is rule-based keyword counts and rolling statistics.
+              </p>
+            </div>
+            <div>
+              <h3 className="text-foreground font-medium mb-1">Regime</h3>
+              <p>
+                A single label for “what kind of environment are we in?” based on the latest signal z-scores. If <strong className="text-foreground">GeopoliticsVolume</strong> z &gt; 1.5 → <strong className="text-foreground">Escalation</strong>. Else if <strong className="text-foreground">RegulationVolume</strong> z &gt; 1.5 → <strong className="text-foreground">Regulatory Pressure</strong>. Else if average Markets/Finance sentiment z &lt; -1 → <strong className="text-foreground">Risk-Off</strong>. Otherwise → <strong className="text-foreground">Risk-On</strong>. <strong className="text-foreground">Confidence</strong> is how extreme the top driver is (0–100%). <strong className="text-foreground">Key drivers</strong> are the three signals with the largest absolute z-scores.
+              </p>
+            </div>
+            <div>
+              <h3 className="text-foreground font-medium mb-1">Core Signals — what each one is</h3>
+              <ul className="list-inside list-disc space-y-1 mb-3">
+                <li><strong className="text-foreground">GeopoliticsVolume</strong> — Volume of Geopolitics-tagged articles vs its 60-day average (z-score).</li>
+                <li><strong className="text-foreground">RegulationVolume</strong> — Volume of Regulation-tagged articles vs its 60-day average.</li>
+                <li><strong className="text-foreground">MarketsSentiment</strong> — Average sentiment of Markets-tagged articles vs their 60-day average.</li>
+                <li><strong className="text-foreground">FinanceSentiment</strong> — Average sentiment of Finance-tagged articles vs their 60-day average.</li>
+                <li><strong className="text-foreground">TechnologyVolume</strong> — Volume of Technology-tagged articles vs its 60-day average.</li>
+                <li><strong className="text-foreground">WarConflictVolume</strong> — Volume of War & Conflict–tagged articles vs its 60-day average.</li>
+              </ul>
+              <p className="mb-2">
+                <strong className="text-foreground">How to read the z-score:</strong> z = (today’s value − 60-day mean) ÷ 60-day standard deviation. So <strong className="text-foreground">z = 0.71</strong> means “today is 0.71 standard deviations above this signal’s recent average”—i.e. moderately more than usual (e.g. for Technology Volume: more tech coverage than typical). <strong className="text-foreground">z &gt; 1</strong> = unusually high; <strong className="text-foreground">z &lt; -1</strong> = unusually low; <strong className="text-foreground">z between -1 and 1</strong> = in the normal range. The chart shows how that z-score has changed over time for the signal you select.
+              </p>
+            </div>
+            <div>
+              <h3 className="text-foreground font-medium mb-1">Signal Performance</h3>
+              <p>
+                A <strong className="text-foreground">backtest</strong>: we simulate trading SPY (S&P 500) using only this signal—long when z &gt; 1, short when z &lt; -1, flat otherwise—over the last 90 days. <strong className="text-foreground">Sharpe</strong> = risk-adjusted return (higher is better). <strong className="text-foreground">Max DD</strong> = largest peak-to-trough drop (lower is better). For context only, not investment advice; results depend on having market price data in the pipeline.
+              </p>
+            </div>
+          </div>
+        </section>
+
         {/* Regime Banner */}
         <section className="mb-16" aria-label="Current regime">
           <div className="glass-card rounded-card border border-[#27272A] p-8">
@@ -175,6 +214,9 @@ export default async function IntelligencePage() {
         <section className="mb-16" aria-label="Core signals">
           <div className="glass-card rounded-card border border-[#27272A] p-8">
             <h2 className="text-section-header text-foreground mb-4">Core Signals</h2>
+            <p className="text-meta text-[#71717A] mb-4">
+              Pick a signal to see its z-score over time. <strong className="text-[#A1A1AA]">z &gt; 1</strong> = unusually high vs last 60 days; <strong className="text-[#A1A1AA]">z &lt; -1</strong> = unusually low; <strong className="text-[#A1A1AA]">-1 to 1</strong> = normal range. Example: Technology Volume z = 0.71 means tech news volume is moderately above its recent average.
+            </p>
             {signals.length > 0 ? (
               <SignalChart
                 signals={signals.map((s) => ({
