@@ -47,6 +47,25 @@ export async function fetchAndIngestNews(): Promise<FetchNewsResult> {
   }
 
   try {
+    // Request freshest articles first via "everything" (sortBy=publishedAt, from=last 24h).
+    // On free tier in production this may be blocked; we fall back to top-headlines below.
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const fromParam = yesterday.toISOString().slice(0, 10);
+    const freshQuery = "business OR markets OR economy OR finance OR stocks";
+    const freshUrl = `https://newsapi.org/v2/everything?q=${encodeURIComponent(freshQuery)}&language=en&sortBy=publishedAt&pageSize=30&from=${fromParam}&apiKey=${newsApiKey}`;
+    const freshRes = await fetch(freshUrl, { cache: "no-store" });
+    if (freshRes.ok) {
+      anyRequestSucceeded = true;
+      const freshRaw = await freshRes.json() as { status: string; articles?: Array<{ source?: { id?: string; name?: string }; title?: string; description?: string; url?: string; publishedAt?: string }> };
+      if (freshRaw.status === "ok" && Array.isArray(freshRaw.articles)) {
+        for (const a of freshRaw.articles) pushArticle(a);
+      }
+    } else {
+      lastApiError = `News API everything (fresh) ${freshRes.status}`;
+      console.error("[fetch-news]", lastApiError, "(everything endpoint may be blocked on free tier in production)");
+    }
+
     for (const category of categories) {
       const url = `https://newsapi.org/v2/top-headlines?country=us&category=${category}&pageSize=20&apiKey=${newsApiKey}`;
       const res = await fetch(url, { cache: "no-store" });
@@ -65,10 +84,10 @@ export async function fetchAndIngestNews(): Promise<FetchNewsResult> {
 
     const fromDate = new Date();
     fromDate.setDate(fromDate.getDate() - 2);
-    const fromParam = fromDate.toISOString().slice(0, 10);
+    const fromParam2 = fromDate.toISOString().slice(0, 10);
 
     for (const { q } of sectorQueries) {
-      const url = `https://newsapi.org/v2/everything?q=${encodeURIComponent(q)}&language=en&sortBy=publishedAt&pageSize=15&from=${fromParam}&apiKey=${newsApiKey}`;
+      const url = `https://newsapi.org/v2/everything?q=${encodeURIComponent(q)}&language=en&sortBy=publishedAt&pageSize=15&from=${fromParam2}&apiKey=${newsApiKey}`;
       const res = await fetch(url, { cache: "no-store" });
       if (!res.ok) {
         const err = await res.text();
@@ -80,6 +99,15 @@ export async function fetchAndIngestNews(): Promise<FetchNewsResult> {
       const raw = await res.json() as { status: string; articles?: Array<{ source?: { id?: string; name?: string }; title?: string; description?: string; url?: string; publishedAt?: string }> };
       if (raw.status !== "ok" || !Array.isArray(raw.articles)) continue;
       for (const a of raw.articles) pushArticle(a);
+    }
+
+    if (allArticles.length > 0) {
+      const dates = allArticles.map((a) => (a.publishedAt ? new Date(a.publishedAt).getTime() : 0)).filter((t) => t > 0);
+      if (dates.length > 0) {
+        const min = new Date(Math.min(...dates)).toISOString().slice(0, 10);
+        const max = new Date(Math.max(...dates)).toISOString().slice(0, 10);
+        console.error("[fetch-news] Fetched", allArticles.length, "articles, date range:", min, "to", max);
+      }
     }
   } catch (e) {
     const message = e instanceof Error ? e.message : "Failed to fetch from News API.";
@@ -101,10 +129,6 @@ export async function fetchAndIngestNews(): Promise<FetchNewsResult> {
 
   try {
     const result = await ingestArticles(allArticles);
-    // Run ML pipeline in background to populate Intelligence (best-effort; don't block response)
-    import("@/lib/pipeline/run").then(({ runPipeline }) =>
-      runPipeline().catch((err) => console.error("[fetch-news] pipeline", err))
-    );
     return { ok: true, ...result, newArticleIds: result.newArticleIds ?? [] };
   } catch (e) {
     const message = e instanceof Error ? e.message : "Database ingest failed.";

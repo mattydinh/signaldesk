@@ -38,6 +38,7 @@ jobs:
           NEWS_API_KEY: ${{ secrets.NEWS_API_KEY }}
           INGEST_URL: ${{ secrets.INGEST_URL }}
           INGEST_API_KEY: ${{ secrets.INGEST_API_KEY }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |
           node scripts/fetch-news-dev.mjs 2>&1
           EXIT=$?
@@ -45,3 +46,27 @@ jobs:
             echo "::error::Fetch or ingest failed (exit $EXIT). Scroll up in this step to see the script error."
           fi
           exit $EXIT
+
+      - name: Run ML pipeline (part 1)
+        env:
+          INGEST_URL: ${{ secrets.INGEST_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "::error::Repository secret CRON_SECRET is not set."
+            exit 1
+          fi
+          echo "Calling $INGEST_URL/api/cron/run-pipeline?part=1"
+          curl -sS -f -H "Authorization: Bearer $CRON_SECRET" "$INGEST_URL/api/cron/run-pipeline?part=1"
+
+      - name: Run ML pipeline (part 2)
+        env:
+          INGEST_URL: ${{ secrets.INGEST_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "::error::Repository secret CRON_SECRET is not set."
+            exit 1
+          fi
+          echo "Calling $INGEST_URL/api/cron/run-pipeline?part=2"
+          curl -sS -f -H "Authorization: Bearer $CRON_SECRET" "$INGEST_URL/api/cron/run-pipeline?part=2"
