@@ -30,7 +30,7 @@ export async function getDailyForwardFilled(
   let lastValue: number | null = null;
   for (const d of dateStrings) {
     const weekEnd = getWeekEnd(d);
-    const v = weekToValue.get(weekEnd) ?? lastValue;
+    const v: number | undefined | null = weekToValue.get(weekEnd) ?? lastValue;
     if (v != null) lastValue = v;
     if (lastValue != null) result.set(d, lastValue);
   }
