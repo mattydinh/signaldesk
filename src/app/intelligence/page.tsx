@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
+import SignalChart from "./SignalChart";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -149,17 +150,21 @@ export default async function IntelligencePage() {
           </div>
         </section>
 
-        {/* Signal Chart placeholder */}
+        {/* Signal Chart */}
         <section className="mb-16" aria-label="Core signals">
           <div className="glass-card rounded-card border border-[#27272A] p-8">
             <h2 className="text-section-header text-foreground mb-4">Core Signals</h2>
             {signals.length > 0 ? (
-              <p className="text-body text-[#A1A1AA]">
-                {signals.length} signal point(s) available. Chart (signal z-score vs asset overlay) coming next.
-              </p>
+              <SignalChart
+                signals={signals.map((s) => ({
+                  date: s.date.toISOString().slice(0, 10),
+                  signalName: s.signalName,
+                  zscore: s.zscore,
+                }))}
+              />
             ) : (
               <p className="text-body text-[#71717A]">
-                No derived signals yet. The daily signals pipeline will populate this.
+                No derived signals yet. Run the pipeline (GET /api/cron/run-pipeline) to populate.
               </p>
             )}
           </div>
