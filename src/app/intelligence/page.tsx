@@ -124,8 +124,10 @@ export default async function IntelligencePage() {
   const hasData = regime != null || signals.length > 0 || backtestResults.length > 0;
 
   let pipelineError: string | null = null;
-  // If no Intelligence data, run the pipeline once so the page can show results (e.g. after first deploy)
-  if (!hasData) {
+  // If no Intelligence data, run the pipeline once at runtime (so the page can show results after first deploy).
+  // Skip auto-run during Vercel build to avoid internal errors when the build env hits the DB.
+  const isBuild = process.env.NEXT_PHASE === "phase-production-build";
+  if (!hasData && !isBuild) {
     try {
       await runPipeline();
       [regime, signals, backtestResults, oilComponents, oilCompositeSeries, oilBacktests] = await Promise.all([
