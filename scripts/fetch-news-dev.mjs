@@ -10,9 +10,9 @@
  * Set INGEST_API_KEY in Vercel and pass it here so only your script can POST.
  */
 
-const NEWS_API_KEY = process.env.NEWS_API_KEY;
-const INGEST_URL = (process.env.INGEST_URL || "https://signaldesk-chi.vercel.app").replace(/\/$/, "");
-const INGEST_API_KEY = process.env.INGEST_API_KEY;
+const NEWS_API_KEY = process.env.NEWS_API_KEY?.trim() || process.env.NEWS_API_KEY;
+const INGEST_URL = (process.env.INGEST_URL || "https://signaldesk-chi.vercel.app").trim().replace(/\/$/, "");
+const INGEST_API_KEY = process.env.INGEST_API_KEY?.trim() || process.env.INGEST_API_KEY;
 
 if (!NEWS_API_KEY) {
   console.error("Set NEWS_API_KEY (e.g. export NEWS_API_KEY=your_key)");
