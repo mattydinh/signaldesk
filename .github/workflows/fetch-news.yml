@@ -1,0 +1,28 @@
+# Fetches from News API and POSTs articles to your app's ingest endpoint.
+# Add repo secrets: NEWS_API_KEY, INGEST_URL (e.g. https://signaldesk-chi.vercel.app), INGEST_API_KEY (optional).
+# Note: News API free tier may block/restrict requests from GitHub; running the script locally is more reliable.
+name: Fetch news and post to app
+
+on:
+  schedule:
+    - cron: "0 14 * * *"   # 14:00 UTC daily
+  workflow_dispatch:
+
+jobs:
+  fetch-and-ingest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Fetch news and POST to app
+        env:
+          NEWS_API_KEY: ${{ secrets.NEWS_API_KEY }}
+          INGEST_URL: ${{ secrets.INGEST_URL }}
+          INGEST_API_KEY: ${{ secrets.INGEST_API_KEY }}
+        run: node scripts/fetch-news-dev.mjs
