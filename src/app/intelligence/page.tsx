@@ -360,11 +360,18 @@ export default async function IntelligencePage() {
                   <div>
                     <p className="text-meta text-[#71717A] mb-2">Backtest: OilCompositeSignal vs tickers</p>
                     <ul className="space-y-2 text-body text-[#A1A1AA]">
-                      {oilBacktests.map((r) => (
-                        <li key={`${r.ticker}-${r.endDate.toISOString().slice(0, 10)}`}>
-                          {r.ticker}: Sharpe {r.sharpe.toFixed(2)}, Max DD {(r.maxDrawdown * 100).toFixed(1)}%, Ann return {((r.annualizedReturn ?? 0) * 100).toFixed(1)}%, Hit rate {(r.hitRate * 100).toFixed(0)}%
-                        </li>
-                      ))}
+                      {oilBacktests.map((r) => {
+                        const sharpe = Number(r.sharpe);
+                        const maxDd = Number(r.maxDrawdown);
+                        const annRet = Number(r.annualizedReturn ?? 0);
+                        const hitRate = Number(r.hitRate ?? 0);
+                        const endStr = r.endDate ? r.endDate.toISOString().slice(0, 10) : r.ticker;
+                        return (
+                          <li key={`${r.ticker}-${endStr}`}>
+                            {r.ticker}: Sharpe {Number.isFinite(sharpe) ? sharpe.toFixed(2) : "—"}, Max DD {Number.isFinite(maxDd) ? (maxDd * 100).toFixed(1) : "—"}%, Ann return {Number.isFinite(annRet) ? (annRet * 100).toFixed(1) : "—"}%, Hit rate {Number.isFinite(hitRate) ? (hitRate * 100).toFixed(0) : "—"}%
+                          </li>
+                        );
+                      })}
                     </ul>
                   </div>
                 )}
