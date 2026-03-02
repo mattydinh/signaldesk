@@ -1,10 +1,13 @@
 /**
- * Oil & Gas signals (Phase 1): OilPriceMomentum from price 30d return,
- * 3-component composite (momentum + EnergySentiment + OilNewsVolume).
- * Writes OilPriceMomentum and OilCompositeSignal to derived_signals.
- * No EIA/rig in this phase.
+ * Oil & Gas signals: OilPriceMomentum, EnergySentiment, OilNewsVolume (Phase 1);
+ * InventoryShock (EIA), RigTrend (Baker Hughes) and 5-component composite (Phase 2).
  */
 import { prisma } from "@/lib/db";
+import {
+  getDailyForwardFilled,
+  EIA_CRUDE_SERIES,
+  BAKER_HUGHES_RIG_SERIES,
+} from "@/lib/pipeline/weekly-fundamentals";
 
 const ROLLING_DAYS = 60;
 const Z_CLIP = 3;
@@ -84,15 +87,100 @@ async function resolveWtiTicker(start: Date, end: Date): Promise<string> {
   return WTI_TICKERS[WTI_TICKERS.length - 1];
 }
 
+const RIG_4W_DAYS = 28;
+
 /**
- * Read EnergySentiment and OilNewsVolume z-scores, compute weighted composite,
+ * EIA inventory week-over-week change, forward-filled to daily; rolling 60d z-score → InventoryShock.
+ */
+async function runInventoryShock(daysBack: number): Promise<number> {
+  const since = new Date();
+  since.setDate(since.getDate() - daysBack);
+  const end = new Date();
+  const dateStrs: string[] = [];
+  for (let d = new Date(since); d <= end; d.setUTCDate(d.getUTCDate() + 1)) {
+    dateStrs.push(d.toISOString().slice(0, 10));
+  }
+  const dailyValues = await getDailyForwardFilled(EIA_CRUDE_SERIES, dateStrs);
+  if (dailyValues.size === 0) return 0;
+
+  const sortedDates = Array.from(dailyValues.keys()).sort();
+  const values = sortedDates.map((d) => dailyValues.get(d)!);
+  let rowsWritten = 0;
+  for (let i = 0; i < sortedDates.length; i++) {
+    const window = values.slice(Math.max(0, i - ROLLING_DAYS + 1), i + 1);
+    const mean = window.reduce((s, x) => s + x, 0) / window.length;
+    const variance =
+      window.length > 1 ? window.reduce((s, x) => s + (x - mean) ** 2, 0) / (window.length - 1) : 0;
+    const std = Math.sqrt(Math.max(0, variance)) || 1;
+    const zscore = zscoreClip((values[i] - mean) / std);
+    const date = new Date(sortedDates[i] + "Z");
+    await prisma.derivedSignal.upsert({
+      where: { date_signalName: { date, signalName: "InventoryShock" } },
+      create: { date, signalName: "InventoryShock", value: values[i], zscore, confidence: 1 },
+      update: { value: values[i], zscore, confidence: 1 },
+    });
+    rowsWritten++;
+  }
+  return rowsWritten;
+}
+
+/**
+ * Baker Hughes rig count forward-filled to daily; 4w change, rolling 60d z-score → RigTrend.
+ */
+async function runRigTrend(daysBack: number): Promise<number> {
+  const since = new Date();
+  since.setDate(since.getDate() - daysBack - RIG_4W_DAYS);
+  const end = new Date();
+  const dateStrs: string[] = [];
+  for (let d = new Date(since); d <= end; d.setUTCDate(d.getUTCDate() + 1)) {
+    dateStrs.push(d.toISOString().slice(0, 10));
+  }
+  const dailyRig = await getDailyForwardFilled(BAKER_HUGHES_RIG_SERIES, dateStrs);
+  if (dailyRig.size === 0) return 0;
+
+  const sortedDates = Array.from(dailyRig.keys()).sort();
+  const change4w: { dateStr: string; change: number }[] = [];
+  for (let i = 0; i < sortedDates.length; i++) {
+    const d = new Date(sortedDates[i] + "Z");
+    const d4 = new Date(d);
+    d4.setUTCDate(d4.getUTCDate() - RIG_4W_DAYS);
+    const d4Str = d4.toISOString().slice(0, 10);
+    const curr = dailyRig.get(sortedDates[i]);
+    const prev = dailyRig.get(d4Str);
+    if (curr != null && prev != null) change4w.push({ dateStr: sortedDates[i], change: curr - prev });
+  }
+  if (change4w.length === 0) return 0;
+
+  const dateStrOrder = change4w.map((c) => c.dateStr);
+  const changes = change4w.map((c) => c.change);
+  let rowsWritten = 0;
+  for (let i = 0; i < change4w.length; i++) {
+    const window = changes.slice(Math.max(0, i - ROLLING_DAYS + 1), i + 1);
+    const mean = window.reduce((s, x) => s + x, 0) / window.length;
+    const variance =
+      window.length > 1 ? window.reduce((s, x) => s + (x - mean) ** 2, 0) / (window.length - 1) : 0;
+    const std = Math.sqrt(Math.max(0, variance)) || 1;
+    const zscore = zscoreClip((changes[i] - mean) / std);
+    const date = new Date(dateStrOrder[i] + "Z");
+    await prisma.derivedSignal.upsert({
+      where: { date_signalName: { date, signalName: "RigTrend" } },
+      create: { date, signalName: "RigTrend", value: changes[i], zscore, confidence: 1 },
+      update: { value: changes[i], zscore, confidence: 1 },
+    });
+    rowsWritten++;
+  }
+  return rowsWritten;
+}
+
+/**
+ * Read all five components (momentum, sentiment, volume, inventory, rig), compute weighted composite,
  * re-z-score over 60d and clip; write OilCompositeSignal.
  */
 async function runOilComposite(daysBack: number): Promise<number> {
   const since = new Date();
   since.setDate(since.getDate() - daysBack);
 
-  const [momentum, sentiment, volume] = await Promise.all([
+  const [momentum, sentiment, volume, inventory, rig] = await Promise.all([
     prisma.derivedSignal.findMany({
       where: { signalName: "OilPriceMomentum", date: { gte: since } },
       orderBy: { date: "asc" },
@@ -105,17 +193,29 @@ async function runOilComposite(daysBack: number): Promise<number> {
       where: { signalName: "OilNewsVolume", date: { gte: since } },
       orderBy: { date: "asc" },
     }),
+    prisma.derivedSignal.findMany({
+      where: { signalName: "InventoryShock", date: { gte: since } },
+      orderBy: { date: "asc" },
+    }),
+    prisma.derivedSignal.findMany({
+      where: { signalName: "RigTrend", date: { gte: since } },
+      orderBy: { date: "asc" },
+    }),
   ]);
 
   const momentumByDate = new Map(momentum.map((s) => [s.date.toISOString().slice(0, 10), s.zscore]));
   const sentimentByDate = new Map(sentiment.map((s) => [s.date.toISOString().slice(0, 10), s.zscore]));
   const volumeByDate = new Map(volume.map((s) => [s.date.toISOString().slice(0, 10), s.zscore]));
+  const inventoryByDate = new Map(inventory.map((s) => [s.date.toISOString().slice(0, 10), s.zscore]));
+  const rigByDate = new Map(rig.map((s) => [s.date.toISOString().slice(0, 10), s.zscore]));
 
   const allDates = Array.from(
     new Set([
       ...Array.from(momentumByDate.keys()),
       ...Array.from(sentimentByDate.keys()),
       ...Array.from(volumeByDate.keys()),
+      ...Array.from(inventoryByDate.keys()),
+      ...Array.from(rigByDate.keys()),
     ])
   ).sort();
 
@@ -124,7 +224,9 @@ async function runOilComposite(daysBack: number): Promise<number> {
     const m = momentumByDate.get(dateStr) ?? 0;
     const s = sentimentByDate.get(dateStr) ?? 0;
     const v = volumeByDate.get(dateStr) ?? 0;
-    const raw = 0.35 * m + 0.25 * s + 0.15 * v;
+    const inv = inventoryByDate.get(dateStr) ?? 0;
+    const r = rigByDate.get(dateStr) ?? 0;
+    const raw = 0.35 * m + 0.25 * s + 0.15 * v + 0.15 * inv + 0.1 * r;
     rawComposite.push({ dateStr, raw });
   }
 
@@ -155,8 +257,15 @@ async function runOilComposite(daysBack: number): Promise<number> {
   return rowsWritten;
 }
 
-export async function runOilSignals(daysBack = 90): Promise<{ oilPriceMomentum: number; oilComposite: number }> {
+export async function runOilSignals(daysBack = 90): Promise<{
+  oilPriceMomentum: number;
+  inventoryShock: number;
+  rigTrend: number;
+  oilComposite: number;
+}> {
   const oilPriceMomentum = await runOilPriceMomentum(daysBack);
+  const inventoryShock = await runInventoryShock(daysBack);
+  const rigTrend = await runRigTrend(daysBack);
   const oilComposite = await runOilComposite(daysBack);
-  return { oilPriceMomentum, oilComposite };
+  return { oilPriceMomentum, inventoryShock, rigTrend, oilComposite };
 }

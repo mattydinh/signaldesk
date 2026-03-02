@@ -152,3 +152,15 @@ model BacktestResult {
 
   @@id([signalName, ticker, startDate, endDate])
 }
+
+// ---- Weekly fundamentals (EIA inventory, Baker Hughes rig count) ----
+// Forward-filled to daily in pipeline when computing oil signals.
+model WeeklyFundamental {
+  series    String   @map("series")   // e.g. "eia_crude_inventory_change", "baker_hughes_rig_count"
+  reportDate DateTime @db.Date @map("report_date")  // week-ending date of the report
+  value     Float    @map("value")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@id([series, reportDate])
+  @@index([series, reportDate(sort: Desc)])
+}

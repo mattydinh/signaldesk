@@ -46,7 +46,13 @@ async function getLatestBacktestResults() {
   }
 }
 
-const OIL_COMPONENT_SIGNALS = ["OilPriceMomentum", "EnergySentiment", "OilNewsVolume"] as const;
+const OIL_COMPONENT_SIGNALS = [
+  "OilPriceMomentum",
+  "EnergySentiment",
+  "OilNewsVolume",
+  "InventoryShock",
+  "RigTrend",
+] as const;
 const OIL_COMPOSITE_NAME = "OilCompositeSignal";
 
 async function getLatestOilComponents() {
@@ -299,7 +305,7 @@ export default async function IntelligencePage() {
           <div className="glass-card rounded-card border border-[#27272A] p-8">
             <h2 className="text-section-header text-foreground mb-1">Oil & Gas</h2>
             <p className="text-meta text-[#71717A] mb-4">
-              Composite from price momentum (30d), Energy sentiment, and Energy volume. Gauge and backtest vs USO, XLE, SPY. No EIA/rig in this phase.
+              Composite from price momentum (30d), Energy sentiment, volume, EIA inventory shock, and rig trend. Gauge and backtest vs USO, XLE, SPY.
             </p>
             {oilZ != null ? (
               <>
@@ -335,14 +341,6 @@ export default async function IntelligencePage() {
                           </td>
                         </tr>
                       ))}
-                      <tr className="border-b border-[#27272A]/60">
-                        <td className="px-4 py-3 text-foreground">Inventory</td>
-                        <td className="px-4 py-3 text-right text-[#71717A]">—</td>
-                      </tr>
-                      <tr className="border-b border-[#27272A]/60">
-                        <td className="px-4 py-3 text-foreground">Rig</td>
-                        <td className="px-4 py-3 text-right text-[#71717A]">—</td>
-                      </tr>
                     </tbody>
                   </table>
                 </div>
