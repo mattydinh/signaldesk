@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import SignalChart from "./SignalChart";
 import PopulateButton from "./PopulateButton";
 import { runPipeline } from "@/lib/pipeline/run";
+import { formatDbError } from "@/lib/format-db-error";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -45,6 +46,13 @@ async function getLatestBacktestResults() {
   }
 }
 
+const REGIME_TOOLTIPS: Record<string, string> = {
+  "Risk-On": "Investors are increasing exposure to equities and higher-risk assets.",
+  "Risk-Off": "Investors are rotating into defensive assets (bonds, gold, cash).",
+  Escalation: "Geopolitics and conflict dominate headlines; markets may price in higher uncertainty.",
+  "Regulatory Pressure": "Regulation and policy are dominating the news; sector-specific risk may be elevated.",
+};
+
 function regimeBadgeClass(regime: string): string {
   const r = regime.toLowerCase();
   if (r.includes("escalation") || r.includes("pressure")) return "bg-[rgba(248,113,113,0.15)] text-[#F87171] border-[#F87171]/40";
@@ -73,7 +81,8 @@ export default async function IntelligencePage() {
       ]);
     } catch (e) {
       console.error("[intelligence] pipeline run failed", e);
-      pipelineError = e instanceof Error ? e.message : "Pipeline run failed (e.g. timeout)";
+      const raw = e instanceof Error ? e.message : "Pipeline run failed (e.g. timeout)";
+      pipelineError = formatDbError(raw);
     }
   }
 
@@ -138,10 +147,14 @@ export default async function IntelligencePage() {
           </p>
         </section>
 
-        {/* How it works */}
-        <section className="mb-16 rounded-card border border-[#27272A] bg-[#18181B]/40 p-6" aria-label="How these metrics work">
-          <h2 className="text-section-header text-foreground mb-4">How this works</h2>
-          <div className="space-y-6 text-body text-[#A1A1AA]">
+        {/* Read me — collapsible */}
+        <section className="mb-16 rounded-card border border-[#27272A] bg-[#18181B]/40 p-6" aria-label="Read me">
+          <details className="group">
+            <summary className="text-section-header text-foreground cursor-pointer list-none flex items-center gap-2 [&::-webkit-details-marker]:hidden">
+              <span>Read me</span>
+              <span className="text-meta text-[#71717A] transition-transform group-open:rotate-90" aria-hidden>▶</span>
+            </summary>
+            <div className="space-y-6 text-body text-[#A1A1AA] mt-4 pt-4 border-t border-[#27272A]">
             <div>
               <h3 className="text-foreground font-medium mb-1">What the ML pipeline does</h3>
               <p className="mb-2">
@@ -151,7 +164,7 @@ export default async function IntelligencePage() {
             <div>
               <h3 className="text-foreground font-medium mb-1">Regime</h3>
               <p>
-                A single label for “what kind of environment are we in?” based on the latest signal z-scores. If <strong className="text-foreground">GeopoliticsVolume</strong> z &gt; 1.5 → <strong className="text-foreground">Escalation</strong>. Else if <strong className="text-foreground">RegulationVolume</strong> z &gt; 1.5 → <strong className="text-foreground">Regulatory Pressure</strong>. Else if average Markets/Finance sentiment z &lt; -1 → <strong className="text-foreground">Risk-Off</strong>. Otherwise → <strong className="text-foreground">Risk-On</strong>. <strong className="text-foreground">Confidence</strong> is how extreme the top driver is (0–100%). <strong className="text-foreground">Key drivers</strong> are the three signals with the largest absolute z-scores.
+                A single label for “what kind of environment are we in?” based on the latest signal z-scores. Risk-On means investors are willing to take risk; Risk-Off means they&apos;re fleeing to safety. Bad news sentiment (z &lt; -1) triggers Risk-Off. If <strong className="text-foreground">GeopoliticsVolume</strong> z &gt; 1.5 → <strong className="text-foreground">Escalation</strong>. Else if <strong className="text-foreground">RegulationVolume</strong> z &gt; 1.5 → <strong className="text-foreground">Regulatory Pressure</strong>. Else if average Markets/Finance sentiment z &lt; -1 → <strong className="text-foreground">Risk-Off</strong>. Otherwise → <strong className="text-foreground">Risk-On</strong>. <strong className="text-foreground">Confidence</strong> is how extreme the top driver is (0–100%). <strong className="text-foreground">Key drivers</strong> are the three signals with the largest absolute z-scores.
               </p>
             </div>
             <div>
@@ -174,17 +187,22 @@ export default async function IntelligencePage() {
                 A <strong className="text-foreground">backtest</strong>: we simulate trading SPY (S&P 500) using only this signal—long when z &gt; 1, short when z &lt; -1, flat otherwise—over the last 90 days. <strong className="text-foreground">Sharpe</strong> = risk-adjusted return (higher is better). <strong className="text-foreground">Max DD</strong> = largest peak-to-trough drop (lower is better). For context only, not investment advice; results depend on having market price data in the pipeline.
               </p>
             </div>
-          </div>
+            </div>
+          </details>
         </section>
 
         {/* Regime Banner */}
         <section className="mb-16" aria-label="Current regime">
           <div className="glass-card rounded-card border border-[#27272A] p-8">
-            <h2 className="text-section-header text-foreground mb-4">Regime</h2>
+            <h2 className="text-section-header text-foreground mb-1">Regime</h2>
+            <p className="text-meta text-[#71717A] mb-4">
+              Risk-On = investors adding risk; Risk-Off = investors reducing risk. Hover the badge for details.
+            </p>
             {regime ? (
               <div className="flex flex-wrap items-center gap-4">
                 <span
-                  className={`inline-flex items-center rounded-badge border px-4 py-2 text-body font-medium ${regimeBadgeClass(regime.regime)}`}
+                  title={REGIME_TOOLTIPS[regime.regime] ?? ""}
+                  className={`inline-flex cursor-help items-center rounded-badge border px-4 py-2 text-body font-medium ${regimeBadgeClass(regime.regime)}`}
                 >
                   {regime.regime}
                 </span>
@@ -236,7 +254,10 @@ export default async function IntelligencePage() {
         {/* Signal Performance */}
         <section className="mb-16" aria-label="Signal performance">
           <div className="glass-card rounded-card border border-[#27272A] p-8">
-            <h2 className="text-section-header text-foreground mb-4">Signal Performance</h2>
+            <h2 className="text-section-header text-foreground mb-1">Signal Performance</h2>
+            <p className="text-meta text-[#71717A] mb-4">
+              Simulated SPY strategy from this signal over the last 90 days (long when z &gt; 1, short when z &lt; -1). <strong className="text-[#A1A1AA]">Sharpe</strong> = risk-adjusted return; <strong className="text-[#A1A1AA]">Max DD</strong> = largest peak-to-trough drop. Not investment advice.
+            </p>
             {backtestResults.length > 0 ? (
               <ul className="space-y-2 text-body text-[#A1A1AA]">
                 {backtestResults.slice(0, 5).map((r, i) => (

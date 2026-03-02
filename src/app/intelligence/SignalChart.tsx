@@ -80,11 +80,17 @@ export default function SignalChart({ signals }: { signals: SignalPoint[] }) {
               stroke="#27272A"
               domain={["auto", "auto"]}
               tickFormatter={(v) => String(v)}
+              label={{ value: "z-score", angle: -90, position: "insideLeft", style: { fill: "#71717A", fontSize: 11 } }}
             />
             <Tooltip
               contentStyle={{ backgroundColor: "#18181B", border: "1px solid #27272A", borderRadius: 8 }}
               labelStyle={{ color: "#A1A1AA" }}
-              formatter={(value: number | undefined) => [value ?? 0, "z-score"]}
+              formatter={(value: number | undefined) => {
+                const z = value ?? 0;
+                const interpretation =
+                  z > 1 ? "Unusually high vs 60-day average" : z < -1 ? "Unusually low vs 60-day average" : "Within normal range";
+                return [`${z} (${interpretation})`, "z-score"];
+              }}
               labelFormatter={(label) => label}
             />
             <Legend />
