@@ -14,6 +14,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Check required secrets
+        run: |
+          if [ -z "${{ secrets.NEWS_API_KEY }}" ]; then
+            echo "::error::Repository secret NEWS_API_KEY is not set. Add it in Settings → Secrets and variables → Actions."
+            exit 1
+          fi
+          if [ -z "${{ secrets.INGEST_URL }}" ]; then
+            echo "::error::Repository secret INGEST_URL is not set. Add it in Settings → Secrets and variables → Actions."
+            exit 1
+          fi
+          echo "Secrets present (NEWS_API_KEY, INGEST_URL)."
+
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
@@ -22,6 +34,7 @@ jobs:
 
       - name: Fetch news and POST to app
         env:
+          CI: "true"
           NEWS_API_KEY: ${{ secrets.NEWS_API_KEY }}
           INGEST_URL: ${{ secrets.INGEST_URL }}
           INGEST_API_KEY: ${{ secrets.INGEST_API_KEY }}
