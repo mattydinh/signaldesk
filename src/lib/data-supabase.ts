@@ -322,7 +322,7 @@ export async function ingestArticlesSupabase(
       existingSourceRes = await sb.from(SOURCE_TABLE_ALT).select("id").eq("slug", slug).maybeSingle();
       existingSource = (existingSourceRes as { data?: unknown }).data;
     }
-    if (!existingSource && SOURCE_TABLE !== "sources" && SOURCE_TABLE_ALT !== "sources") {
+    if (!existingSource && SOURCE_TABLE !== "sources") {
       existingSourceRes = await sb.from("sources").select("id").eq("slug", slug).maybeSingle();
       existingSource = (existingSourceRes as { data?: unknown }).data;
     }
@@ -342,7 +342,7 @@ export async function ingestArticlesSupabase(
         newSource = (insertSourceRes as { data?: unknown }).data;
         insertSourceErr = (insertSourceRes as { error?: unknown }).error;
       }
-      if (insertSourceErr && SOURCE_TABLE !== "sources" && SOURCE_TABLE_ALT !== "sources") {
+      if (insertSourceErr && SOURCE_TABLE !== "sources") {
         insertSourceRes = await sb.from("sources").insert(sourcePayload).select("id").single();
         newSource = (insertSourceRes as { data?: unknown }).data;
         insertSourceErr = (insertSourceRes as { error?: unknown }).error;
@@ -408,7 +408,7 @@ export async function ingestArticlesSupabase(
         insertErr = (insertRes as { error?: unknown }).error;
       }
     }
-    if (insertErr && ARTICLE_TABLE !== "articles" && ARTICLE_TABLE_ALT !== "articles") {
+    if (insertErr && ARTICLE_TABLE !== "articles") {
       insertRes = await sb.from("articles").insert(articleRow).select("id").single();
       newArticle = (insertRes as { data?: unknown }).data;
       insertErr = (insertRes as { error?: unknown }).error;
