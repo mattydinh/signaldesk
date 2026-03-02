@@ -377,9 +377,12 @@ export default async function IntelligencePage() {
                 )}
               </>
             ) : (
-              <p className="text-body text-[#71717A]">
-                No oil composite data yet. Run the pipeline (part 1 + part 2) so derived signals and oil signals are computed.
-              </p>
+              <div className="space-y-3">
+                <p className="text-body text-[#71717A]">
+                  No oil composite data yet. Run the pipeline (part 1 + part 2) so derived signals and oil signals are computed.
+                </p>
+                <PopulateButton />
+              </div>
             )}
           </div>
         </section>
@@ -430,10 +433,18 @@ export default async function IntelligencePage() {
           </div>
         </section>
 
-        {!hasDataNow && (
+        {(!hasDataNow || oilZ == null) && (
           <div className="space-y-4 rounded-card border border-[#27272A] bg-[#18181B]/60 p-6">
             <p className="text-body text-[#A1A1AA]">
-              Intelligence data comes from the ML pipeline (events → signals → regime → backtest). That pipeline runs automatically after you <Link href="/dashboard" className="text-[#FAFAFA] underline">fetch news</Link> or on a schedule; the first run can take up to a minute and may timeout on Vercel.
+              {hasDataNow
+                ? "Run the pipeline to fill in the oil composite and any other missing data."
+                : "Intelligence data comes from the ML pipeline (events → signals → regime → backtest). That pipeline runs automatically after you "}
+              {!hasDataNow && (
+                <>
+                  <Link href="/dashboard" className="text-[#FAFAFA] underline">fetch news</Link>
+                  {" or on a schedule; the first run can take up to a minute and may timeout on Vercel."}
+                </>
+              )}
             </p>
             {pipelineError && (
               <p className="text-body text-[#F87171]">
