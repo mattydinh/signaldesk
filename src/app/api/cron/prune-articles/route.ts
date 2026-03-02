@@ -4,6 +4,8 @@ import { getSupabaseAdmin, hasSupabaseDb } from "@/lib/supabase-server";
 
 const DEFAULT_RETENTION_DAYS = 30;
 
+export const maxDuration = 60;
+
 /**
  * GET /api/cron/prune-articles
  * Deletes articles older than ARTICLE_RETENTION_DAYS (default 30).

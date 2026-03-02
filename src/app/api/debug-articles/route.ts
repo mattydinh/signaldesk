@@ -1,15 +1,28 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase-server";
 
 export const dynamic = "force-dynamic";
 
 const ARTICLE_TABLE = process.env.SUPABASE_ARTICLE_TABLE ?? "Article";
 
+function allowDebug(request: NextRequest): boolean {
+  if (process.env.NODE_ENV !== "production") return true;
+  const secret = process.env.CRON_SECRET?.trim();
+  if (!secret) return true;
+  const provided =
+    request.headers.get("authorization")?.replace(/^Bearer\s+/i, "")?.trim() ??
+    request.nextUrl.searchParams.get("secret")?.trim();
+  return provided === secret;
+}
+
 /**
  * GET /api/debug-articles — inspect raw Supabase article list response.
- * Remove or protect in production.
+ * In production, requires CRON_SECRET in ?secret= or Authorization: Bearer.
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
+  if (!allowDebug(request)) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
   const supabase = getSupabaseAdmin();
   if (!supabase) {
     return NextResponse.json({ ok: false, message: "Supabase not configured" });

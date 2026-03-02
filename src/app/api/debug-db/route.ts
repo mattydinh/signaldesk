@@ -1,12 +1,25 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
 /**
  * GET /api/debug-db — troubleshoot DB connection (no secrets).
- * Remove or protect this in production.
+ * In production, requires CRON_SECRET in ?secret= or Authorization: Bearer.
  */
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+function allowDebug(request: NextRequest): boolean {
+  if (process.env.NODE_ENV !== "production") return true;
+  const secret = process.env.CRON_SECRET?.trim();
+  if (!secret) return true; // no secret set: allow (backward compat)
+  const provided =
+    request.headers.get("authorization")?.replace(/^Bearer\s+/i, "")?.trim() ??
+    request.nextUrl.searchParams.get("secret")?.trim();
+  return provided === secret;
+}
+
+export async function GET(request: NextRequest) {
+  if (!allowDebug(request)) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
   const url = process.env.POSTGRES_PRISMA_URL ?? process.env.DATABASE_URL;
   if (!url) {
     return NextResponse.json({

@@ -6,6 +6,8 @@ import { hasBlobFeed, readFeedFromBlob } from "@/lib/feed-blob";
 const SOURCE_TABLE = process.env.SUPABASE_SOURCE_TABLE ?? "Source";
 const ARTICLE_TABLE = process.env.SUPABASE_ARTICLE_TABLE ?? "Article";
 
+export const maxDuration = 120;
+
 function slugify(name: string): string {
   return name
     .toLowerCase()

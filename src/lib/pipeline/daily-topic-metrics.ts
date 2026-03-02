@@ -12,6 +12,9 @@ function toDate(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
 
+/** Max events to load per run to avoid OOM/timeouts (90 days can be large). */
+const MAX_EVENTS = 20_000;
+
 export async function runDailyTopicMetrics(daysBack = 90): Promise<{ rowsUpserted: number }> {
   const since = new Date();
   since.setDate(since.getDate() - daysBack);
@@ -19,6 +22,7 @@ export async function runDailyTopicMetrics(daysBack = 90): Promise<{ rowsUpserte
     where: { publishedAt: { gte: since }, features: { isNot: null } },
     include: { features: true },
     orderBy: { publishedAt: "asc" },
+    take: MAX_EVENTS,
   });
 
   const byTopicDate = new Map<
