@@ -63,7 +63,13 @@ For **local dev** without Supabase REST: add **SUPABASE_URL** and **SUPABASE_SER
    - **NEWS_API_KEY**, **GROQ_API_KEY** (or OPENAI_API_KEY)
 3. For **Weekly Brief**: ensure **POSTGRES_PRISMA_URL** is set, then run the SQL in `prisma/scripts/create-weekly-summary-table.sql` once in Supabase → SQL Editor to create the `WeeklySummary` table.
 4. Deploy.
-5. For **Intelligence** (ML pipeline): run `npx prisma db push` once so the pipeline tables exist (`Event`, `EventFeature`, `DailyTopicMetric`, `DerivedSignal`, `MarketPrice`, `RegimeSnapshot`, `BacktestResult`). New article ingest dual-writes to `Event`; pipeline jobs (signals, regime, backtest) populate the rest when implemented. Optionally set **CRON_SECRET**, **DASHBOARD_PASSWORD**, **INGEST_API_KEY**, **ARTICLE_RETENTION_DAYS**.
+5. For **Intelligence** (ML pipeline): run `npx prisma db push` once so the pipeline tables exist (`Event`, `EventFeature`, `DailyTopicMetric`, `DerivedSignal`, `MarketPrice`, `RegimeSnapshot`, `BacktestResult`). New article ingest dual-writes to `Event`; pipeline jobs (event features → daily topic metrics → derived signals → market prices → regime → backtest) populate the rest. **Run the pipeline once after deploy** (or on a schedule):
+
+```bash
+curl -H "Authorization: Bearer YOUR_CRON_SECRET" "https://YOUR_APP.vercel.app/api/cron/run-pipeline"
+```
+
+If **CRON_SECRET** is set, the request must include it. Optionally add a Vercel cron schedule for `GET /api/cron/run-pipeline` (e.g. daily). Also set **CRON_SECRET**, **DASHBOARD_PASSWORD**, **INGEST_API_KEY**, **ARTICLE_RETENTION_DAYS** as needed.
 
 **Debug:** GET `/api/debug-db` shows which DB/feed store is in use. GET `/api/debug-articles` inspects raw Supabase article list response.
 
