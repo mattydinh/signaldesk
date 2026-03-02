@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "prisma generate && next build",
+    "postinstall": "prisma generate",
     "start": "next start",
     "lint": "next lint",
     "db:generate": "prisma generate",
@@ -25,7 +26,8 @@
     "react-dom": "^18.3.1",
     "recharts": "^3.7.0",
     "tailwind-merge": "^2.5.4",
-    "yahoo-finance2": "^3.13.1"
+    "yahoo-finance2": "^3.13.1",
+    "prisma": "^5.22.0"
   },
   "devDependencies": {
     "@types/node": "^20",
@@ -35,7 +37,6 @@
     "eslint": "^8",
     "eslint-config-next": "14.2.18",
     "postcss": "^8",
-    "prisma": "^5.22.0",
     "tailwindcss": "^3.4.14",
     "tailwindcss-animate": "^1.0.7",
     "typescript": "^5"
