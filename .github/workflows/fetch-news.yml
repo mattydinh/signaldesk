@@ -56,8 +56,13 @@ jobs:
             echo "::error::Repository secret CRON_SECRET is not set."
             exit 1
           fi
-          echo "Calling $INGEST_URL/api/cron/run-pipeline?part=1"
-          curl -sS -f -H "Authorization: Bearer $CRON_SECRET" "$INGEST_URL/api/cron/run-pipeline?part=1"
+          BASE_URL="$INGEST_URL"
+          case "$BASE_URL" in
+            http://*|https://*) ;;
+            *) BASE_URL="https://$BASE_URL" ;;
+          esac
+          echo "Calling $BASE_URL/api/cron/run-pipeline?part=1"
+          curl -sS -L -f -H "Authorization: Bearer $CRON_SECRET" -H "Accept: application/json" "$BASE_URL/api/cron/run-pipeline?part=1"
 
       - name: Run ML pipeline (part 2)
         env:
@@ -68,5 +73,10 @@ jobs:
             echo "::error::Repository secret CRON_SECRET is not set."
             exit 1
           fi
-          echo "Calling $INGEST_URL/api/cron/run-pipeline?part=2"
-          curl -sS -f -H "Authorization: Bearer $CRON_SECRET" "$INGEST_URL/api/cron/run-pipeline?part=2"
+          BASE_URL="$INGEST_URL"
+          case "$BASE_URL" in
+            http://*|https://*) ;;
+            *) BASE_URL="https://$BASE_URL" ;;
+          esac
+          echo "Calling $BASE_URL/api/cron/run-pipeline?part=2"
+          curl -sS -L -f -H "Authorization: Bearer $CRON_SECRET" -H "Accept: application/json" "$BASE_URL/api/cron/run-pipeline?part=2"
