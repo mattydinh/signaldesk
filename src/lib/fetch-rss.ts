@@ -48,6 +48,56 @@ function getLink(item: any): string | undefined {
   return undefined;
 }
 
+/** Normalize URL for use as externalId so same story with different params/fragment = one row. */
+function normalizeArticleUrl(url: string): string {
+  try {
+    const u = new URL(url.trim());
+    u.hash = "";
+    const params = u.searchParams;
+    // Strip common tracking params so same article URL from different feeds matches
+    for (const key of ["utm_source", "utm_medium", "utm_campaign", "utm_content", "utm_term", "fbclid", "ref"]) {
+      params.delete(key);
+    }
+    u.search = params.toString();
+    return u.toString();
+  } catch {
+    return url.trim();
+  }
+}
+
+/** True if URL looks like the feed itself or a generic RSS/section URL, not a per-article link. */
+function isLikelyFeedOrSectionUrl(link: string, feedUrl: string): boolean {
+  const s = link.toLowerCase();
+  if (!s || s === feedUrl.toLowerCase()) return true;
+  if (s.endsWith(".xml") || s.includes("/feed/") || s.includes("/rss") || s.includes("/rss/")) return true;
+  try {
+    const feed = new URL(feedUrl);
+    const item = new URL(link);
+    if (feed.origin === item.origin && item.pathname === feed.pathname) return true;
+  } catch {
+    // ignore
+  }
+  return false;
+}
+
+/** Stable unique id when we can't use link (missing, or feed URL). Prefer guid when it looks like a permalink. */
+function fallbackExternalId(
+  sourceSlug: string,
+  title: string,
+  publishedAt: string | undefined,
+  guid: string | undefined
+): string {
+  if (guid && typeof guid === "string" && guid.trim().length > 0) {
+    const g = guid.trim();
+    if (g.startsWith("http") && !g.includes("/feed") && !g.endsWith(".xml")) return normalizeArticleUrl(g);
+  }
+  const datePart = publishedAt ? publishedAt.slice(0, 10) : "";
+  const key = `${sourceSlug}|${title.trim().toLowerCase().slice(0, 200)}|${datePart}`;
+  let h = 0;
+  for (let i = 0; i < key.length; i++) h = (Math.imul(31, h) + key.charCodeAt(i)) | 0;
+  return `gen:${sourceSlug}:${datePart}:${Math.abs(h).toString(36)}`;
+}
+
 function getSummary(item: any): string | undefined {
   if (!item) return undefined;
   return (
@@ -69,22 +119,45 @@ export async function fetchRssFeed(feed: RssFeedConfig): Promise<IngestArticle[]
     const parsed = parser.parse(xml);
     const items = normalizeItems(parsed);
 
+    const sourceSlug = slugify(feed.sourceName);
     const articles: IngestArticle[] = [];
+    const seenExternalIdsInFeed = new Set<string>();
     for (const item of items) {
       const title = typeof item.title === "string" ? item.title.trim() : "";
       if (!title) continue;
       const link = getLink(item);
-      const summary = getSummary(item);
+      const guid =
+        typeof item.guid === "string"
+          ? item.guid
+          : typeof item.guid?._ === "string"
+            ? item.guid._
+            : undefined;
       const published =
         item.pubDate ?? item.published ?? item.updated ?? item["dc:date"] ?? undefined;
       const publishedAt = toIsoDate(published);
+      const useLinkAsId =
+        link &&
+        link.trim().length > 0 &&
+        !isLikelyFeedOrSectionUrl(link, feed.url);
+      let externalId: string;
+      if (useLinkAsId) {
+        const normalized = normalizeArticleUrl(link!);
+        if (seenExternalIdsInFeed.has(normalized)) {
+          externalId = fallbackExternalId(sourceSlug, title, publishedAt, guid);
+        } else {
+          seenExternalIdsInFeed.add(normalized);
+          externalId = normalized;
+        }
+      } else {
+        externalId = fallbackExternalId(sourceSlug, title, publishedAt, guid);
+      }
       articles.push({
-        externalId: link ?? undefined,
+        externalId,
         sourceName: feed.sourceName,
-        sourceSlug: slugify(feed.sourceName),
+        sourceSlug,
         sourceBaseUrl: feed.sourceBaseUrl,
         title,
-        summary: summary ?? undefined,
+        summary: getSummary(item) ?? undefined,
         url: link ?? undefined,
         publishedAt,
         rawPayload: item,
