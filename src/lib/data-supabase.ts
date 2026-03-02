@@ -72,6 +72,14 @@ export async function getArticlesSupabase(options: {
       : null;
   const publishedBefore = useWindow ? options.windowEnd! : null;
 
+  function sortByNewestFirst<T extends { publishedAt?: string | null }>(arr: T[]): T[] {
+    return [...arr].sort((a, b) => {
+      const tA = a.publishedAt ? new Date(a.publishedAt).getTime() : 0;
+      const tB = b.publishedAt ? new Date(b.publishedAt).getTime() : 0;
+      return tB - tA;
+    });
+  }
+
   if (hasBlobFeed()) {
     const blobFeed = await readFeedFromBlob();
     if (blobFeed && blobFeed.length > 0) {
@@ -89,6 +97,7 @@ export async function getArticlesSupabase(options: {
         const q = options.q.trim().toLowerCase();
         list = list.filter((a) => a.title?.toLowerCase().includes(q) || (a.summary && a.summary.toLowerCase().includes(q)));
       }
+      list = sortByNewestFirst(list);
       const total = list.length;
       const articles = list.slice(options.offset, options.offset + options.limit);
       const realIds = articles.filter((a) => !a.id.startsWith("cache-")).map((a) => a.id);
@@ -126,6 +135,7 @@ export async function getArticlesSupabase(options: {
         const q = options.q.trim().toLowerCase();
         list = list.filter((a) => a.title?.toLowerCase().includes(q) || (a.summary && a.summary.toLowerCase().includes(q)));
       }
+      list = sortByNewestFirst(list);
       const total = list.length;
       const articles = list.slice(options.offset, options.offset + options.limit);
       const realIds = articles.filter((a) => !a.id.startsWith("cache-")).map((a) => a.id);
