@@ -11,7 +11,8 @@
  */
 
 const NEWS_API_KEY = process.env.NEWS_API_KEY?.trim() || process.env.NEWS_API_KEY;
-const INGEST_URL = (process.env.INGEST_URL || "https://signaldesk-chi.vercel.app").trim().replace(/\/$/, "");
+let INGEST_URL = (process.env.INGEST_URL || "https://signaldesk-chi.vercel.app").trim().replace(/\/$/, "");
+if (INGEST_URL && !/^https?:\/\//i.test(INGEST_URL)) INGEST_URL = "https://" + INGEST_URL;
 const INGEST_API_KEY = process.env.INGEST_API_KEY?.trim() || process.env.INGEST_API_KEY;
 
 if (!NEWS_API_KEY) {
