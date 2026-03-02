@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { generateWeeklySummary } from "@/lib/weeklySummary";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 /**
  * GET /api/cron/generate-weekly-summary
@@ -10,11 +11,12 @@ export const dynamic = "force-dynamic";
  * Schedule: Sundays 18:00 UTC. CRON_SECRET required if set.
  */
 export async function GET(request: NextRequest) {
-  const cronSecret = process.env.CRON_SECRET;
+  const cronSecret = process.env.CRON_SECRET?.trim();
   if (cronSecret) {
-    const provided =
+    const raw =
       request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ??
       request.nextUrl.searchParams.get("secret");
+    const provided = (raw ?? "").trim();
     if (provided !== cronSecret) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { prisma } from "@/lib/db";
+import GenerateBriefButton from "./GenerateBriefButton";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 60;
@@ -65,9 +66,15 @@ export default async function WeeklyPage() {
           <h1 id="weekly-heading" className="text-page-title text-foreground">
             Weekly Intelligence Brief
           </h1>
-          <p className="mt-2 text-body text-[#A1A1AA]">
+            <p className="mt-2 text-body text-[#A1A1AA]">
             China geopolitics, US conflict exposure, and investor sector impact.
           </p>
+          <p className="mt-2 text-meta text-[#71717A]">
+            Briefs are generated automatically Sundays at 6 PM UTC. If one is missing, generate it below.
+          </p>
+          <div className="mt-4">
+            <GenerateBriefButton />
+          </div>
         </section>
 
         {summaries.length === 0 ? (
@@ -75,7 +82,7 @@ export default async function WeeklyPage() {
             <div className="flex justify-center">
               <Image src="/weekly-empty-placeholder.png" alt="" width={400} height={300} className="rounded-card object-cover" />
             </div>
-            <p>No briefs yet. The first one will appear after the weekly job runs (Sundays at 6 PM UTC).</p>
+            <p>No briefs yet. Use the “Generate weekly brief” button above to create one.</p>
           </div>
         ) : (
           <ul className="grid grid-cols-1 gap-6 md:grid-cols-2" role="list" aria-label="Weekly briefs">
