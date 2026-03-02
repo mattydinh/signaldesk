@@ -337,7 +337,7 @@ export async function ingestArticlesSupabase(
       for (const a of existing ?? []) {
         if (!byId.has(a.id)) byId.set(a.id, a);
       }
-      return [...byId.values()].sort((a, b) => {
+      return Array.from(byId.values()).sort((a, b) => {
         const tA = a.publishedAt ? new Date(a.publishedAt).getTime() : 0;
         const tB = b.publishedAt ? new Date(b.publishedAt).getTime() : 0;
         return tB - tA;
