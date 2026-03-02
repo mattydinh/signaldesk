@@ -80,14 +80,40 @@ export async function getArticlesSupabase(options: {
     });
   }
 
+  /** Keep one article per URL (or id if no url) so the feed has no duplicate entries. */
+  function dedupeByUrl<T extends { id: string; url?: string | null }>(articles: T[]): T[] {
+    const seen = new Set<string>();
+    return articles.filter((a) => {
+      const key = (a.url?.trim() || a.id).toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }
+
+  /** Keep one article per (title, sourceId, publishedAt) to avoid many identical headlines from dupes. */
+  function dedupeByTitleSourceDate<T extends { id: string; title?: string | null; sourceId: string; publishedAt?: string | null }>(articles: T[]): T[] {
+    const seen = new Set<string>();
+    return articles.filter((a) => {
+      const title = (a.title ?? "").trim().slice(0, 200);
+      const date = a.publishedAt ? new Date(a.publishedAt).toISOString().slice(0, 10) : "";
+      const key = `${title.toLowerCase()}|${a.sourceId}|${date}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }
+
   // When Supabase is configured, use it as source of truth (newest first, full table).
   const supabaseFirst = getSupabaseAdmin();
   if (supabaseFirst) {
     const sb = supabaseFirst as any;
     const cols = "id,sourceId,title,summary,url,publishedAt,externalId,entities,topics,categories,opportunities,implications,forShareholders,forInvestors,forBusiness";
+    // Fetch extra rows so after dedupe we still have enough for the page (handles duplicate titles in DB).
+    const fetchSize = Math.min(200, Math.max(options.limit * 3, options.offset + options.limit));
     const from = options.offset;
-    const to = options.offset + options.limit - 1;
-    let q = sb.from(ARTICLE_TABLE).select(cols, { count: "exact" }).order("publishedAt", { ascending: false }).range(from, to);
+    const to = options.offset + fetchSize - 1;
+    let q = sb.from(ARTICLE_TABLE).select(cols, { count: "exact" }).order("publishedAt", { ascending: false }).order("id", { ascending: false }).range(from, to);
     if (publishedAfter) q = q.gte("publishedAt", publishedAfter);
     if (publishedBefore) q = q.lte("publishedAt", publishedBefore);
     if (options.sourceId) q = q.eq("sourceId", options.sourceId);
@@ -102,7 +128,7 @@ export async function getArticlesSupabase(options: {
     let count = typeof (result as { count?: number }).count === "number" ? (result as { count: number }).count : null;
     let err = (result as { error?: unknown }).error;
     if (err && ARTICLE_TABLE_ALT) {
-      let qAlt = sb.from(ARTICLE_TABLE_ALT).select(cols, { count: "exact" }).order("publishedAt", { ascending: false }).range(from, to);
+      let qAlt = sb.from(ARTICLE_TABLE_ALT).select(cols, { count: "exact" }).order("publishedAt", { ascending: false }).order("id", { ascending: false }).range(from, to);
       if (publishedAfter) qAlt = qAlt.gte("publishedAt", publishedAfter);
       if (publishedBefore) qAlt = qAlt.lte("publishedAt", publishedBefore);
       if (options.sourceId) qAlt = qAlt.eq("sourceId", options.sourceId);
@@ -119,12 +145,16 @@ export async function getArticlesSupabase(options: {
     }
     if (!err && Array.isArray(data)) {
       const articles = data as ArticleRow[];
-      const total = count ?? articles.length;
       const withInferred = articles.map((a) => ({
         ...a,
         categories: a.categories?.length ? a.categories : inferCategoriesFromText(a.title ?? null, a.summary ?? null),
       }));
-      return { articles: withInferred, total };
+      // Dedupe by id (same row twice), then url, then title+source+date so one card per logical article.
+      const byId = Array.from(new Map(withInferred.map((a) => [a.id, a])).values());
+      const dedupedUrl = dedupeByUrl(byId);
+      const dedupedLogical = dedupeByTitleSourceDate(dedupedUrl);
+      const paged = dedupedLogical.slice(options.offset, options.offset + options.limit);
+      return { articles: paged, total: count ?? dedupedLogical.length };
     }
   }
 
@@ -146,6 +176,8 @@ export async function getArticlesSupabase(options: {
         list = list.filter((a) => a.title?.toLowerCase().includes(q) || (a.summary && a.summary.toLowerCase().includes(q)));
       }
       list = sortByNewestFirst(list);
+      list = dedupeByUrl(list);
+      list = dedupeByTitleSourceDate(list);
       const total = list.length;
       const articles = list.slice(options.offset, options.offset + options.limit);
       const realIds = articles.filter((a) => !a.id.startsWith("cache-")).map((a) => a.id);
@@ -184,6 +216,8 @@ export async function getArticlesSupabase(options: {
         list = list.filter((a) => a.title?.toLowerCase().includes(q) || (a.summary && a.summary.toLowerCase().includes(q)));
       }
       list = sortByNewestFirst(list);
+      list = dedupeByUrl(list);
+      list = dedupeByTitleSourceDate(list);
       const total = list.length;
       const articles = list.slice(options.offset, options.offset + options.limit);
       const realIds = articles.filter((a) => !a.id.startsWith("cache-")).map((a) => a.id);
