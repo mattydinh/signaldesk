@@ -31,7 +31,10 @@ export async function fetchAndIngestNews(): Promise<FetchNewsResult> {
 
   function pushArticle(a: { source?: { id?: string; name?: string }; title?: string; description?: string; url?: string; publishedAt?: string }) {
     if (!a.title) return;
-    const dedupe = `${a.source?.id ?? "unknown"}-${a.title}`;
+    // URL-first dedupe: headlines repeat frequently and can hide genuinely new URLs.
+    const urlKey = typeof a.url === "string" && a.url.trim().length > 0 ? a.url.trim() : null;
+    const titleKey = `${a.source?.id ?? "unknown"}|${String(a.title).trim().toLowerCase().slice(0, 200)}|${a.publishedAt ? String(a.publishedAt).slice(0, 10) : ""}`;
+    const dedupe = (urlKey ?? titleKey).toLowerCase();
     if (seen.has(dedupe)) return;
     seen.add(dedupe);
     allArticles.push({

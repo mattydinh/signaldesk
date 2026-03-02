@@ -25,7 +25,10 @@ const seen = new Set();
 
 function push(a) {
   if (!a.title) return;
-  const dedupe = `${a.source?.id ?? "unknown"}-${a.title}`;
+  // URL-first dedupe: titles repeat often (and can hide genuinely new URLs).
+  const urlKey = typeof a.url === "string" && a.url.trim().length > 0 ? a.url.trim() : null;
+  const titleKey = `${a.source?.id ?? "unknown"}|${String(a.title).trim().toLowerCase().slice(0, 200)}|${a.publishedAt ? String(a.publishedAt).slice(0, 10) : ""}`;
+  const dedupe = (urlKey ?? titleKey).toLowerCase();
   if (seen.has(dedupe)) return;
   seen.add(dedupe);
   allArticles.push({
