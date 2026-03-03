@@ -8,16 +8,21 @@ const TICKERS = ["SPY", "QQQ", "XLK", "XLF", "VNQ", "GLD", "USO", "XLE", "CL=F",
 type HistoricalRow = { date: Date; open: number; high: number; low: number; close: number; volume: number };
 
 async function fetchHistorical(
+  yahooFinance: { historical: (symbol: string, opts: { period1: string; period2: string }) => Promise<unknown> },
   symbol: string,
   period1: string,
   period2: string
 ): Promise<HistoricalRow[]> {
-  const yf = (await import("yahoo-finance2")).default as { historical: (s: string, o: { period1: string; period2: string }) => Promise<unknown> };
-  const result = await yf.historical(symbol, { period1, period2 });
+  const result = await yahooFinance.historical(symbol, { period1, period2 });
   return (Array.isArray(result) ? result : []) as HistoricalRow[];
 }
 
 export async function runMarketPrices(daysBack = 365): Promise<{ rowsWritten: number }> {
+  const YahooFinance = (await import("yahoo-finance2")).default as new (opts?: { suppressNotices?: string[] }) => {
+    historical: (symbol: string, opts: { period1: string; period2: string }) => Promise<unknown>;
+  };
+  const yahooFinance = new YahooFinance({ suppressNotices: ["ripHistorical"] });
+
   const end = new Date();
   const start = new Date();
   start.setDate(start.getDate() - daysBack);
@@ -27,7 +32,7 @@ export async function runMarketPrices(daysBack = 365): Promise<{ rowsWritten: nu
   let rowsWritten = 0;
   for (const ticker of TICKERS) {
     try {
-      const rows = await fetchHistorical(ticker, period1, period2);
+      const rows = await fetchHistorical(yahooFinance, ticker, period1, period2);
       rows.sort((a, b) => a.date.getTime() - b.date.getTime());
       let prevClose = 0;
       for (const r of rows) {
