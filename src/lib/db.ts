@@ -1,4 +1,5 @@
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient } from "@/generated/prisma/client";
+import { PrismaPg } from "@prisma/adapter-pg";
 
 // Use integration's var if set; else fall back to common names (e.g. manual DATABASE_URL or POSTGRES_URL)
 let url =
@@ -14,13 +15,18 @@ if (url) {
   } catch {
     url = url.includes("?") ? `${url}&pgbouncer=true` : `${url}?pgbouncer=true`;
   }
-  process.env.POSTGRES_PRISMA_URL = url;
 }
 
 const globalForPrisma = globalThis as unknown as { prisma: PrismaClient };
 
-export const prisma =
-  globalForPrisma.prisma ??
-  new PrismaClient({ log: process.env.NODE_ENV === "development" ? ["query", "error", "warn"] : ["error"] });
+function createClient() {
+  const adapter = new PrismaPg({ connectionString: url });
+  return new PrismaClient({
+    adapter,
+    log: process.env.NODE_ENV === "development" ? ["query", "error", "warn"] : ["error"],
+  });
+}
+
+export const prisma = globalForPrisma.prisma ?? createClient();
 
 if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;

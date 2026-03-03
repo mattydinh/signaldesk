@@ -28,7 +28,7 @@ const defaultFeeds: RssFeedConfig[] = [
     sourceBaseUrl: "https://www.marketwatch.com",
   },
   {
-    url: "https://rss.cnn.com/rss/money_latest.rss",
+    url: "http://rss.cnn.com/rss/edition_business.rss",
     sourceName: "CNN Business",
     sourceBaseUrl: "https://www.cnn.com",
   },
@@ -50,11 +50,6 @@ const defaultFeeds: RssFeedConfig[] = [
 
   // Geopolitics / Political
   {
-    url: "https://apnews.com/rss/apf-topnews",
-    sourceName: "AP News",
-    sourceBaseUrl: "https://apnews.com",
-  },
-  {
     url: "https://feeds.npr.org/1004/rss.xml",
     sourceName: "NPR World",
     sourceBaseUrl: "https://www.npr.org",
@@ -67,7 +62,7 @@ const defaultFeeds: RssFeedConfig[] = [
 
   // Energy / Oil
   {
-    url: "https://www.eia.gov/rss/news.xml",
+    url: "https://www.eia.gov/rss/todayinenergy.xml",
     sourceName: "EIA Energy News",
     sourceBaseUrl: "https://www.eia.gov",
   },
@@ -79,7 +74,7 @@ const defaultFeeds: RssFeedConfig[] = [
 
   // Healthcare / Pharma
   {
-    url: "https://www.fda.gov/about-fda/contact-fda/stay-informed/rss-feeds/press-releases",
+    url: "https://www.fda.gov/about-fda/contact-fda/stay-informed/rss-feeds/press-releases/rss.xml",
     sourceName: "FDA Press Releases",
     sourceBaseUrl: "https://www.fda.gov",
   },

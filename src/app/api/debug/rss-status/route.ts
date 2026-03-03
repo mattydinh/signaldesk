@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
     articles_skipped_count: status?.articlesSkippedCount ?? null,
     last_error: status?.lastError ?? null,
     pipeline_stage: status?.pipelineStage ?? null,
-    hint: "Run a fetch (dashboard button or /api/cron/ingest-news) then refresh. Use ?run=1 for live diagnostic.",
+    hint: "Run a fetch (dashboard button or /api/cron/run-all) then refresh. Use ?run=1 for live diagnostic.",
   };
 
   if (!runLive) {

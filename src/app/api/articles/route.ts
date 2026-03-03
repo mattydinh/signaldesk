@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { Prisma } from "@prisma/client";
+import { Prisma } from "@/generated/prisma/client";
 import { hasSupabaseDb } from "@/lib/supabase-server";
 import { getArticlesSupabase, getSourcesSupabase } from "@/lib/data-supabase";
 

@@ -124,7 +124,12 @@ export async function fetchRssFeed(feed: RssFeedConfig): Promise<IngestArticle[]
     const articles: IngestArticle[] = [];
     const seenExternalIdsInFeed = new Set<string>();
     items.forEach((item, index) => {
-      const title = typeof item.title === "string" ? item.title.trim() : "";
+      const rawTitle = item.title;
+      const title = (
+        typeof rawTitle === "string" ? rawTitle :
+        typeof rawTitle?.["#text"] === "string" ? rawTitle["#text"] :
+        ""
+      ).trim();
       if (!title) return;
       const link = getLink(item);
       const guid =

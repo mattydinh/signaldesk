@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { Prisma } from "@prisma/client";
+import { Prisma } from "@/generated/prisma/client";
 import { hasSupabaseDb } from "@/lib/supabase-server";
 import { ingestArticlesSupabase } from "@/lib/data-supabase";
 
