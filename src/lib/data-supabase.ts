@@ -312,28 +312,40 @@ export async function ingestArticlesSupabase(
   // ── 1. Batch-resolve sources: one SELECT for all unique slugs ──
   const sourceIdCache = new Map<string, string>(); // slug → id
   const uniqueSlugs = Array.from(new Set(validArticles.map((a) => a.sourceSlug ?? slugify(a.sourceName))));
-  const sourceTables = [SOURCE_TABLE, SOURCE_TABLE_ALT, "sources"].filter(Boolean) as string[];
+  const sourceTables = [SOURCE_TABLE, SOURCE_TABLE_ALT, "sources", "Source"].filter(
+    (t, i, arr) => t && arr.indexOf(t) === i
+  ) as string[];
   let resolvedSourceTable: string | null = null;
   for (const t of sourceTables) {
     const res = await sb.from(t).select("id, slug").in("slug", uniqueSlugs);
     if (!res.error && Array.isArray(res.data)) {
       resolvedSourceTable = t;
-      for (const s of res.data as { id: string; slug: string }[]) sourceIdCache.set(s.slug, s.id);
+      for (const row of res.data as Record<string, unknown>[]) {
+        const slugVal = String(row.slug ?? (row as any).source_slug ?? "").trim();
+        const idVal = String(row.id ?? row.Id ?? "").trim();
+        if (slugVal && idVal) sourceIdCache.set(slugVal, idVal);
+      }
       break;
     }
   }
+  console.log("[data-supabase] sources resolved:", sourceIdCache.size, "of", uniqueSlugs.length);
+
   // Insert only the missing sources (usually 0; new sources are rare)
+  // Supabase Source table may lack DEFAULT on id; provide id explicitly.
   for (const slug of uniqueSlugs.filter((s) => !sourceIdCache.has(s))) {
     const a = validArticles.find((a) => (a.sourceSlug ?? slugify(a.sourceName)) === slug)!;
-    const payload = { name: a.sourceName, slug, baseUrl: a.sourceBaseUrl ?? null };
+    const id = typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `src_${slug}_${Date.now()}`;
     const tables = resolvedSourceTable ? [resolvedSourceTable] : sourceTables;
     for (const t of tables) {
-      const res = await sb.from(t).insert(payload).select("id").single();
+      const payloadCamel = { id, name: a.sourceName, slug, baseUrl: a.sourceBaseUrl ?? null };
+      const payloadSnake = { id, name: a.sourceName, slug, base_url: a.sourceBaseUrl ?? null };
+      let res = await sb.from(t).insert(payloadCamel).select("id").single();
+      if (res.error) res = await sb.from(t).insert(payloadSnake).select("id").single();
       if (!res.error && (res.data as any)?.id) {
-        sourceIdCache.set(slug, (res.data as any).id);
+        sourceIdCache.set(slug, (res.data as any).id ?? (res.data as any).Id ?? id);
         break;
       }
-      console.error("[data-supabase] insert source failed", t, (res.error as any)?.message);
+      console.error("[data-supabase] insert source failed", t, slug, (res.error as any)?.message);
     }
   }
 
@@ -341,24 +353,40 @@ export async function ingestArticlesSupabase(
   skipped += validArticles.length - canProcess.length;
 
   // ── 2. Batch dedup: one SELECT for all externalIds ──
+  // Supabase/PostgREST may use snake_case (external_id); handle both.
+  // Chunk to avoid URL length limits when checking 200+ long URLs.
   const externalIds = Array.from(new Set(canProcess.map((a) => a.externalId).filter(Boolean) as string[]));
-  const existingSet = new Set<string>(); // externalIds already in DB
-  const existingIdMap = new Map<string, string>(); // externalId → article DB id
+  console.log("[data-supabase] dedup check: canProcess=", canProcess.length, "unique externalIds=", externalIds.length);
+  const existingSet = new Set<string>();
+  const existingIdMap = new Map<string, string>();
+  const CHUNK = 80; // avoid URL length limits with many long externalIds
+  const colVariants: [string, string][] = [["externalId", "externalId"], ["external_id", "external_id"]];
   if (externalIds.length > 0) {
     const articleTables = [ARTICLE_TABLE, ARTICLE_TABLE_ALT, "articles"].filter(Boolean) as string[];
-    for (const t of articleTables) {
-      const res = await sb.from(t).select("id, externalId").in("externalId", externalIds);
-      if (!res.error && Array.isArray(res.data)) {
-        for (const row of res.data as { id: string; externalId: string }[]) {
-          if (row.externalId) {
-            existingSet.add(row.externalId);
-            existingIdMap.set(row.externalId, row.id);
+    outer: for (const t of articleTables) {
+      for (const [selectCol, inCol] of colVariants) {
+        let ok = true;
+        for (let i = 0; i < externalIds.length && ok; i += CHUNK) {
+          const chunk = externalIds.slice(i, i + CHUNK);
+          const res = await sb.from(t).select(`id, ${selectCol}`).in(inCol, chunk);
+          if (res.error || !Array.isArray(res.data)) {
+            ok = false;
+            break;
+          }
+          for (const row of res.data as Record<string, unknown>[]) {
+            const extId = String(row[selectCol] ?? "").trim() || null;
+            const idVal = (row.id ?? row.Id) as string | undefined;
+            if (extId && idVal) {
+              existingSet.add(extId);
+              existingIdMap.set(extId, idVal);
+            }
           }
         }
-        break;
+        if (ok) break outer;
       }
     }
   }
+  console.log("[data-supabase] existingSet size:", existingSet.size, "existing externalIds found in DB");
 
   // Partition into existing (skip) vs. new (insert)
   const toInsert: IngestArticleInput[] = [];
@@ -371,6 +399,7 @@ export async function ingestArticlesSupabase(
     }
     toInsert.push(a);
   }
+  console.log("[data-supabase] toInsert:", toInsert.length, "toSkip:", canProcess.length - toInsert.length);
 
   // ── 3. Batch insert all new articles in one query ──
   if (toInsert.length > 0) {
@@ -394,6 +423,7 @@ export async function ingestArticlesSupabase(
         }
         const msg = String((res.error as any)?.message ?? "");
         const isColErr = msg.includes("column") || msg.includes("does not exist");
+        console.log("[data-supabase] batch insert attempt", t, snake ? "snake" : "camel", "error:", msg);
         if (!isColErr) break; // not a column error — try next table name
       }
     }
@@ -401,20 +431,29 @@ export async function ingestArticlesSupabase(
     // If batch failed, fall back to individual inserts
     if (!insertedRows) {
       console.error("[data-supabase] batch insert failed; falling back to per-article inserts");
+      const tables = [ARTICLE_TABLE, ARTICLE_TABLE_ALT, "articles"].filter(Boolean) as string[];
       for (const a of toInsert) {
         const sourceId = sourceIdCache.get(a.sourceSlug ?? slugify(a.sourceName))!;
         const publishedAt = a.publishedAt ? new Date(a.publishedAt).toISOString() : null;
-        const row = { sourceId, externalId: a.externalId ?? null, title: a.title, summary: a.summary ?? null, url: a.url ?? null, publishedAt, rawPayload: a.rawPayload ?? null };
-        let res = await sb.from(ARTICLE_TABLE).insert(row).select("id").single();
-        if (res.error && ARTICLE_TABLE_ALT) res = await sb.from(ARTICLE_TABLE_ALT).insert(row).select("id").single();
-        if (res.error && ARTICLE_TABLE !== "articles") res = await sb.from("articles").insert(row).select("id").single();
-        if (!res.error && (res.data as any)?.id) {
-          const newId = (res.data as any).id;
+        const rowCamel = { sourceId, externalId: a.externalId ?? null, title: a.title, summary: a.summary ?? null, url: a.url ?? null, publishedAt, rawPayload: a.rawPayload ?? null };
+        const rowSnake = { source_id: sourceId, external_id: a.externalId ?? null, title: a.title, summary: a.summary ?? null, url: a.url ?? null, published_at: publishedAt, raw_payload: a.rawPayload ?? null };
+        let res: { error?: unknown; data?: { id?: string } } = { error: new Error("not tried") };
+        for (const t of tables) {
+          res = await sb.from(t).insert(rowCamel).select("id").single();
+          if (!res.error) break;
+          const isColErr = String((res.error as any)?.message ?? "").includes("column") || String((res.error as any)?.message ?? "").includes("does not exist");
+          if (isColErr) res = await sb.from(t).insert(rowSnake).select("id").single();
+          if (!res.error) break;
+        }
+        const newId = res.data?.id;
+        if (!res.error && newId) {
           created++;
           newArticleIds.push(newId);
           feedEntries.push(toCachedArticle(a, newId, sourceId));
           await createEventFromArticle({ id: newId, title: a.title, summary: a.summary ?? null, url: a.url ?? null, publishedAt: publishedAt ?? undefined });
         } else {
+          const errMsg = String((res.error as any)?.message ?? (res.error as any)?.code ?? "");
+          if (errMsg && created === 0 && skipped < 3) console.log("[data-supabase] individual insert failed:", errMsg.slice(0, 120));
           skipped++;
         }
       }

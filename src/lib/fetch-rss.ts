@@ -113,7 +113,7 @@ export async function fetchRssFeed(feed: RssFeedConfig): Promise<IngestArticle[]
   try {
     const res = await fetch(feed.url, { cache: "no-store", signal: AbortSignal.timeout(5000) });
     if (!res.ok) {
-      console.error("[fetch-rss] feed failed", feed.url, res.status);
+      console.error("[fetch-rss] feed failed", feed.url, "status:", res.status);
       return [];
     }
     const xml = await res.text();
@@ -140,14 +140,18 @@ export async function fetchRssFeed(feed: RssFeedConfig): Promise<IngestArticle[]
         link &&
         link.trim().length > 0 &&
         !isLikelyFeedOrSectionUrl(link, feed.url);
+      // Include publishedAt in externalId so feeds that reuse URLs (update titles/dates, same URL)
+      // produce distinct ids. Same URL + same date = dedup; same URL + different date = new article.
+      const datePart = publishedAt ? publishedAt.slice(0, 10) : "";
       let externalId: string;
       if (useLinkAsId) {
         const normalized = normalizeArticleUrl(link!);
-        if (seenExternalIdsInFeed.has(normalized)) {
+        const urlWithDate = datePart ? `${normalized}|${datePart}` : normalized;
+        if (seenExternalIdsInFeed.has(urlWithDate)) {
           externalId = fallbackExternalId(sourceSlug, title, publishedAt, guid, index);
         } else {
-          seenExternalIdsInFeed.add(normalized);
-          externalId = normalized;
+          seenExternalIdsInFeed.add(urlWithDate);
+          externalId = urlWithDate;
         }
       } else {
         externalId = fallbackExternalId(sourceSlug, title, publishedAt, guid, index);
@@ -164,6 +168,7 @@ export async function fetchRssFeed(feed: RssFeedConfig): Promise<IngestArticle[]
         rawPayload: item,
       });
     });
+    console.log("[fetch-rss] parsed", feed.sourceName, "items:", items.length, "articles:", articles.length);
     return articles;
   } catch (e) {
     console.error("[fetch-rss] error", feed.url, e);
@@ -181,17 +186,22 @@ export async function fetchAllRssArticles(): Promise<IngestArticle[]> {
     if (result.status === "fulfilled") all.push(...result.value);
   }
 
-  // URL-first dedupe across all feeds.
+  // Dedupe across feeds. Use url+date so feeds that reuse URLs for updated content
+  // don't drop newer articles. Same URL + same date = syndication (keep one).
   const seen = new Set<string>();
   const deduped: IngestArticle[] = [];
 
   for (const a of all) {
     if (!a.title) continue;
-    const urlKey = typeof a.url === "string" && a.url.trim().length > 0 ? a.url.trim() : null;
+    const datePart = a.publishedAt ? a.publishedAt.slice(0, 10) : "";
+    const urlKey =
+      typeof a.url === "string" && a.url.trim().length > 0
+        ? (a.url.trim() + (datePart ? `|${datePart}` : "")).toLowerCase()
+        : null;
     const titleKey = `${a.sourceSlug ?? slugify(a.sourceName)}|${a.title
       .trim()
       .toLowerCase()
-      .slice(0, 200)}|${a.publishedAt ? a.publishedAt.slice(0, 10) : ""}`;
+      .slice(0, 200)}|${datePart}`;
     const dedupeKey = (urlKey ?? titleKey).toLowerCase();
     if (seen.has(dedupeKey)) continue;
     seen.add(dedupeKey);
@@ -199,6 +209,8 @@ export async function fetchAllRssArticles(): Promise<IngestArticle[]> {
   }
 
   // Guarantee unique (sourceSlug, externalId) so ingest never skips new articles as "already in feed".
+  console.log("[fetch-rss] after cross-feed dedup: all=", all.length, "deduped=", deduped.length);
+
   const seenKey = new Map<string, number>();
   for (const a of deduped) {
     const slug = a.sourceSlug ?? slugify(a.sourceName);

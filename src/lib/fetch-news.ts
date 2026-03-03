@@ -1,4 +1,5 @@
 import { ingestArticles, type IngestArticle } from "@/lib/ingest";
+import { setRssStatus } from "./rss-status-store";
 import { fetchAllRssArticles } from "./fetch-rss";
 
 export type FetchNewsResult =
@@ -10,14 +11,24 @@ export type FetchNewsResult =
  * Used by cron and by "Fetch news now" on the dashboard.
  */
 export async function fetchAndIngestNews(): Promise<FetchNewsResult> {
+  const timestamp = new Date().toISOString();
+  setRssStatus({ lastFetchTimestamp: timestamp, pipelineStage: "fetch" });
+
   let articles: IngestArticle[];
   try {
     articles = await fetchAllRssArticles();
   } catch (e) {
     const message = e instanceof Error ? e.message : "Failed to fetch from RSS feeds.";
     console.error("[fetch-news] RSS fetch error", e);
+    setRssStatus({ lastError: message, pipelineStage: "error" });
     return { ok: false, error: message };
   }
+
+  setRssStatus({ articlesFetchedCount: articles.length, pipelineStage: "dedup" });
+  const dates = articles.map((a) => a.publishedAt).filter(Boolean) as string[];
+  const minDate = dates.length ? dates.reduce((a, b) => (a < b ? a : b)) : null;
+  const maxDate = dates.length ? dates.reduce((a, b) => (a > b ? a : b)) : null;
+  console.log("[fetch-news] articles fetched:", articles.length, "dateRange:", minDate, "..", maxDate);
 
   if (!articles.length) {
     return {
@@ -29,6 +40,13 @@ export async function fetchAndIngestNews(): Promise<FetchNewsResult> {
 
   try {
     const result = await ingestArticles(articles);
+    setRssStatus({
+      articlesInsertedCount: result.created,
+      articlesSkippedCount: result.skipped,
+      lastError: null,
+      pipelineStage: "done",
+    });
+    console.log("[fetch-news] ingest result: created=", result.created, "skipped=", result.skipped, "total=", result.total);
     return {
       ok: true,
       ...result,
@@ -38,6 +56,7 @@ export async function fetchAndIngestNews(): Promise<FetchNewsResult> {
   } catch (e) {
     const message = e instanceof Error ? e.message : "Database ingest failed.";
     console.error("[fetch-news] ingest error", e);
+    setRssStatus({ lastError: message, pipelineStage: "error" });
     return { ok: false, error: message };
   }
 }
