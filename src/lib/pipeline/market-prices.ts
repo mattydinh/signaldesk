@@ -1,5 +1,6 @@
 /**
  * Pipeline step 4: fetch market prices from Yahoo Finance and store in market_prices.
+ * Uses yahoo-finance2 v3 API (YahooFinance instance).
  */
 import { prisma } from "@/lib/db";
 
