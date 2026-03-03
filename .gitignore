@@ -13,6 +13,7 @@
 .env
 .env*.local
 .vercel
+.mcp.json
 
 # prisma
 /src/generated/prisma
